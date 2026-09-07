@@ -651,60 +651,42 @@ export default function App() {
             )}
 
             {/* 3. GAME PLAY SECTION */}
-            {(activeTab === 'GAME' || activeTab === 'QUEST') && (
+            {activeTab === 'GAME' && (
               <div className="flex flex-col gap-6 animate-page-enter">
-                {/* Level 6: Quest Completion & Mastery Certificate */}
-                {currentLevelIndex >= 5 && isAllLevelsCompleted ? (
-                  <>
-                    <LevelProgressBar
-                      currentLevelId={6}
-                      completedLevels={completedLevels}
-                      onSelectLevel={(lvlId) => {
-                        soundManager.playClick();
-                        setCurrentLevelIndex(lvlId - 1);
-                        if (lvlId <= 5) {
-                          initLevel(lvlId - 1);
-                        }
-                      }}
-                      onOpenLab={() => setActiveTab('LAB')}
-                      isCompletionActive={true}
-                    />
-                    <QuestCompletionView
-                      onReplayLevel={(lvlId) => {
-                        setCurrentLevelIndex(lvlId - 1);
-                        initLevel(lvlId - 1);
-                      }}
-                      onOpenTheory={() => {
-                        setActiveTheoryTopic('what-is-hashing');
-                        setActiveTab('THEORY');
-                      }}
-                      onOpenSandbox={() => {
-                        setActiveTab('LAB');
-                      }}
-                      onOpenQuiz={() => {
-                        setActiveTab('QUIZ');
-                      }}
-                      onOpenProgress={() => {
-                        setActiveTab('PROGRESS');
-                      }}
-                    />
-                  </>
-                ) : (
-                  <SingleLinkedListGame
-                    currentLevelId={currentLevelIndex + 1}
-                    onSelectLevel={(lvlId) => {
-                      soundManager.playClick();
-                      setCurrentLevelIndex(lvlId - 1);
-                    }}
-                    onOpenLab={() => setActiveTab('LAB')}
-                    onOpenTheory={() => {
-                      setActiveTheoryTopic('theory-01');
-                      setActiveTab('THEORY');
-                    }}
-                    onOpenQuiz={() => setActiveTab('QUIZ')}
-                    onOpenProgress={() => setActiveTab('PROGRESS')}
-                  />
-                )}
+                <SingleLinkedListGame
+                  onOpenLab={() => setActiveTab('LAB')}
+                  onOpenTheory={() => {
+                    setActiveTheoryTopic('theory-01');
+                    setActiveTab('THEORY');
+                  }}
+                  onOpenQuiz={() => setActiveTab('QUIZ')}
+                  onOpenProgress={() => setActiveTab('PROGRESS')}
+                />
+              </div>
+            )}
+
+            {/* QUEST COMPLETION */}
+            {activeTab === 'QUEST' && (
+              <div className="flex flex-col gap-6 animate-page-enter">
+                <QuestCompletionView
+                  onReplayLevel={(lvlId) => {
+                    setCurrentLevelIndex(lvlId - 1);
+                    setActiveTab('GAME');
+                  }}
+                  onOpenTheory={() => {
+                    setActiveTheoryTopic('what-is-hashing');
+                    setActiveTab('THEORY');
+                  }}
+                  onOpenSandbox={() => {
+                    setActiveTab('LAB');
+                  }}
+                  onOpenQuiz={() => {
+                    setActiveTab('QUIZ');
+                  }}
+                  onOpenProgress={() => {
+                    setActiveTab('PROGRESS');
+                  }}
+                />
               </div>
             )}
 

@@ -62,9 +62,12 @@ interface SLLOperationGameScreenProps {
   taskId: string;
   onBackToMenu: () => void;
   onCompleteTask: (taskId: string, nextTaskId?: string) => void;
-  onSelectLevel: (lvlId: number) => void;
+  onSelectLevel?: (lvlId: number) => void;
   onSelectTask?: (taskId: string) => void;
   totalScore: number;
+  topicTitle?: string;
+  taskTitleOverride?: string;
+  taskNumberOverride?: number;
 }
 
 export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
@@ -74,6 +77,9 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   onSelectLevel,
   onSelectTask,
   totalScore,
+  topicTitle,
+  taskTitleOverride,
+  taskNumberOverride,
 }) => {
   const activeTask: SLLTaskDef = SLL_TASKS[taskId] || SLL_TASKS.L1_T1;
   const currentLevelId = activeTask.levelId;
@@ -768,15 +774,15 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-blue-950/60 border border-slate-200 dark:border-blue-900/30 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Levels</span>
+            <span>Back to Tasks</span>
           </button>
 
           <div>
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#2563EB] dark:text-blue-400 block">
-              LEVEL 0{currentLevelId} • TASK #{activeTask.taskIndex}
+              {topicTitle ? `${topicTitle.toUpperCase()} • TASK #${taskNumberOverride || activeTask.taskIndex}` : `TASK #${activeTask.taskIndex}`}
             </span>
             <h2 className="text-base sm:text-lg font-bold font-display text-slate-900 dark:text-white leading-tight">
-              {activeTask.title}
+              {taskTitleOverride || activeTask.title}
             </h2>
           </div>
         </div>
@@ -867,11 +873,11 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
                     Concept & Educational Reference
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white dark:bg-blue-950/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-blue-900/30">
-                    Task #{activeTask.taskIndex}
+                    Task #{taskNumberOverride || activeTask.taskIndex}
                   </span>
                 </div>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                  {activeTask.title} — Conceptual Foundations
+                  {taskTitleOverride || activeTask.title} — Conceptual Foundations
                 </h3>
               </div>
             </div>

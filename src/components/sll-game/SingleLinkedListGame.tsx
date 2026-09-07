@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { SLLOperationsMenu } from './SLLOperationsMenu';
+import { SLLTopicSelectMenu } from './SLLTopicSelectMenu';
+import { SLLTopicScreen } from './SLLTopicScreen';
 import { SLLOperationGameScreen } from './SLLOperationGameScreen';
-import { SLLLevelCompleteModal } from './SLLLevelCompleteModal';
-import { LEVEL_TASK_IDS, LEVEL_METADATA } from '../../data/sllTasks';
+import { SLLTopicCompleteModal } from './SLLTopicCompleteModal';
+import { SLLTopicId, SLL_TOPICS } from '../../data/sllTopics';
 import { progressManager } from '../../utils/progressManager';
-import { soundManager } from '../../utils/audio';
 
 interface SingleLinkedListGameProps {
-  currentLevelId: number;
-  onSelectLevel: (lvlId: number) => void;
+  currentLevelId?: number;
+  onSelectLevel?: (lvlId: number) => void;
   onOpenLab?: () => void;
   onOpenTheory?: () => void;
   onOpenQuiz?: () => void;
@@ -23,8 +23,8 @@ export const SingleLinkedListGame: React.FC<SingleLinkedListGameProps> = ({
   onOpenQuiz,
   onOpenProgress,
 }) => {
-  // Navigation Flow State: 'menu' | 'task'
-  const [viewMode, setViewMode] = useState<'menu' | 'task'>('menu');
+  // Navigation State: null = main 3 cards, or a selected SLLTopicId
+  const [selectedTopicId, setSelectedTopicId] = useState<SLLTopicId | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   // Completed tasks tracking
@@ -38,7 +38,8 @@ export const SingleLinkedListGame: React.FC<SingleLinkedListGameProps> = ({
   });
 
   const [totalScore, setTotalScore] = useState<number>(() => progressManager.getState().totalScore);
-  const [showLevelCompleteModal, setShowLevelCompleteModal] = useState<boolean>(false);
+  const [showTopicCompleteModal, setShowTopicCompleteModal] = useState<boolean>(false);
+  const [completedTopicId, setCompletedTopicId] = useState<SLLTopicId | null>(null);
 
   // Save completed tasks to local storage
   useEffect(() => {
@@ -49,127 +50,127 @@ export const SingleLinkedListGame: React.FC<SingleLinkedListGameProps> = ({
     }
   }, [completedTasks]);
 
-  // When level tab changes, reset to menu
-  useEffect(() => {
-    setViewMode('menu');
-    setActiveTaskId(null);
-  }, [currentLevelId]);
-
-  // Select a task to play
-  const handleSelectTask = (taskId: string) => {
-    setActiveTaskId(taskId);
-    setViewMode('task');
-  };
-
-  // Back to task selection menu
-  const handleBackToMenu = () => {
-    setViewMode('menu');
-    setActiveTaskId(null);
-  };
-
-  // On completing a task in the dedicated screen
+  // Handle task completion
   const handleCompleteTask = (taskId: string, nextTaskId?: string) => {
-    setCompletedTasks((prev) => {
-      if (!prev.includes(taskId)) {
-        return [...prev, taskId];
-      }
-      return prev;
-    });
-
-    setTotalScore(progressManager.getState().totalScore);
-
-    // Check if all tasks for the current level are completed
-    const levelTaskList = LEVEL_TASK_IDS[currentLevelId] || [];
     const updatedCompleted = completedTasks.includes(taskId)
       ? completedTasks
       : [...completedTasks, taskId];
 
-    const allLevelTasksDone = levelTaskList.every((id) => updatedCompleted.includes(id));
+    setCompletedTasks(updatedCompleted);
+    setTotalScore(progressManager.getState().totalScore);
 
-    if (allLevelTasksDone && !progressManager.getState().levelsCompleted.includes(currentLevelId)) {
-      progressManager.markLevelCompleted(currentLevelId, 100, true);
-      setShowLevelCompleteModal(true);
-    }
+    // If a topic is selected, check if this was the last task or if all tasks in topic are done
+    if (selectedTopicId) {
+      const currentTopic = SLL_TOPICS[selectedTopicId];
+      const allTopicDone = currentTopic.tasks.every((t) => updatedCompleted.includes(t.id));
+      const wasAllTopicDoneBefore = currentTopic.tasks.every((t) => completedTasks.includes(t.id));
 
-    if (nextTaskId) {
-      setActiveTaskId(nextTaskId);
-      setViewMode('task');
+      if (allTopicDone && !wasAllTopicDoneBefore) {
+        setCompletedTopicId(selectedTopicId);
+        setShowTopicCompleteModal(true);
+      }
+
+      // Sync progressManager levels so overall mastery stats stay accurate
+      if (selectedTopicId === 'insertion') {
+        progressManager.markLevelCompleted(1, 100, true);
+      } else if (selectedTopicId === 'deletion') {
+        progressManager.markLevelCompleted(2, 100, true);
+      } else if (selectedTopicId === 'traversal') {
+        progressManager.markLevelCompleted(3, 100, true);
+      }
+
+      // Determine next task within the topic
+      const currentIndex = currentTopic.tasks.findIndex((t) => t.id === taskId);
+      if (currentIndex >= 0 && currentIndex < currentTopic.tasks.length - 1) {
+        const nextInTopic = currentTopic.tasks[currentIndex + 1].id;
+        setActiveTaskId(nextInTopic);
+      } else {
+        // Topic tasks finished
+        setActiveTaskId(null);
+      }
     } else {
-      setViewMode('menu');
-      setActiveTaskId(null);
+      if (nextTaskId) {
+        setActiveTaskId(nextTaskId);
+      } else {
+        setActiveTaskId(null);
+      }
     }
   };
 
-  const levelMeta = LEVEL_METADATA[currentLevelId] || LEVEL_METADATA[1];
+  const selectedTopic = selectedTopicId ? SLL_TOPICS[selectedTopicId] : null;
+  const currentTopicTask = selectedTopic && activeTaskId
+    ? selectedTopic.tasks.find((t) => t.id === activeTaskId)
+    : null;
 
-  const levelTakeaways: Record<number, string[]> = {
-    1: [
-      'Nodes store DATA + NEXT address pointer in heap memory.',
-      'Insert at Beginning: new_node.next = HEAD, then HEAD = new_node [O(1)].',
-      'Insert at End: tail.next = new_node, then TAIL = new_node [O(1)].',
-    ],
-    2: [
-      'Delete at Beginning: HEAD = HEAD.next, free old node [O(1)].',
-      'Delete at End: Traverse to second-to-last node, set next = NULL, free last [O(N)].',
-      'Always advance pointer before calling free() to avoid dangling pointer crash.',
-    ],
-    3: [
-      'Single Linked Lists traverse in one forward direction from HEAD to NULL.',
-      'CURRENT pointer advances via CURRENT = CURRENT.next.',
-      'Traversal visits all N nodes in O(N) linear time.',
-    ],
-    4: [
-      'Linear search examines elements sequentially starting from HEAD.',
-      'Stops immediately upon finding matching DATA.',
-      'Worst-case time complexity is O(N) when element is absent or at tail.',
-    ],
-    5: [
-      'Demonstrated complete mastery of manual node allocation, pointer rewiring, deletions, search, and traversal.',
-      'Maintained list structural integrity with zero memory leaks across 7 complex pointer manipulations.',
-    ],
-  };
+  const topicOrder: SLLTopicId[] = ['insertion', 'deletion', 'traversal'];
+  const nextTopicId: SLLTopicId | null = completedTopicId
+    ? topicOrder[topicOrder.indexOf(completedTopicId) + 1] || null
+    : null;
 
   return (
     <div className="w-full">
-      {viewMode === 'menu' || !activeTaskId ? (
-        <SLLOperationsMenu
-          currentLevelId={currentLevelId}
-          onSelectLevel={onSelectLevel}
-          onSelectTask={handleSelectTask}
+      {/* View 1: Main 3 Topic Cards */}
+      {!selectedTopicId && (
+        <SLLTopicSelectMenu
+          onSelectTopic={(topicId) => {
+            setSelectedTopicId(topicId);
+            setActiveTaskId(null);
+          }}
           completedTasks={completedTasks}
-          totalScore={totalScore}
-        />
-      ) : (
-        <SLLOperationGameScreen
-          taskId={activeTaskId}
-          onBackToMenu={handleBackToMenu}
-          onCompleteTask={handleCompleteTask}
-          onSelectLevel={onSelectLevel}
-          onSelectTask={(id) => setActiveTaskId(id)}
           totalScore={totalScore}
         />
       )}
 
-      {/* Level Completion Celebration Modal */}
-      {showLevelCompleteModal && (
-        <SLLLevelCompleteModal
-          levelId={currentLevelId}
-          stars={3}
+      {/* View 2: Topic Tasks Screen */}
+      {selectedTopicId && !activeTaskId && (
+        <SLLTopicScreen
+          topicId={selectedTopicId}
+          onBackToTopics={() => setSelectedTopicId(null)}
+          onSelectTask={(taskId) => setActiveTaskId(taskId)}
+          completedTasks={completedTasks}
+        />
+      )}
+
+      {/* View 3: Interactive Operation Game Screen */}
+      {selectedTopicId && activeTaskId && (
+        <SLLOperationGameScreen
+          taskId={activeTaskId}
+          onBackToMenu={() => setActiveTaskId(null)}
+          onCompleteTask={handleCompleteTask}
+          onSelectLevel={onSelectLevel}
+          onSelectTask={(id) => setActiveTaskId(id)}
+          totalScore={totalScore}
+          topicTitle={selectedTopic?.title}
+          taskTitleOverride={currentTopicTask?.title}
+          taskNumberOverride={currentTopicTask?.taskNumber}
+        />
+      )}
+
+      {/* Topic Completion Celebration Modal */}
+      {showTopicCompleteModal && completedTopicId && (
+        <SLLTopicCompleteModal
+          topicTitle={SLL_TOPICS[completedTopicId].title}
           scoreAwarded={100}
-          onNextLevel={() => {
-            setShowLevelCompleteModal(false);
-            if (currentLevelId < 5) {
-              onSelectLevel(currentLevelId + 1);
+          hasNextTopic={Boolean(nextTopicId)}
+          onNextTopic={() => {
+            setShowTopicCompleteModal(false);
+            if (nextTopicId) {
+              setSelectedTopicId(nextTopicId);
+              setActiveTaskId(null);
             } else {
-              onSelectLevel(6);
+              setSelectedTopicId(null);
+              setActiveTaskId(null);
             }
           }}
-          onReplayLevel={() => {
-            setShowLevelCompleteModal(false);
-            setViewMode('menu');
+          onBackToTopics={() => {
+            setShowTopicCompleteModal(false);
+            setSelectedTopicId(null);
+            setActiveTaskId(null);
           }}
-          title={levelMeta.title}
-          conceptsLearned={levelTakeaways[currentLevelId] || []}
+          onReplayTopic={() => {
+            setShowTopicCompleteModal(false);
+            setActiveTaskId(null);
+          }}
         />
       )}
     </div>
