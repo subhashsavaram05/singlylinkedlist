@@ -3,6 +3,7 @@ import { SLLTopicSelectMenu } from './SLLTopicSelectMenu';
 import { SLLTopicScreen } from './SLLTopicScreen';
 import { SLLOperationGameScreen } from './SLLOperationGameScreen';
 import { SLLTopicCompleteModal } from './SLLTopicCompleteModal';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { SLLTopicId, SLL_TOPICS } from '../../data/sllTopics';
 import { progressManager } from '../../utils/progressManager';
 
@@ -123,27 +124,39 @@ export const SingleLinkedListGame: React.FC<SingleLinkedListGameProps> = ({
 
       {/* View 2: Topic Tasks Screen */}
       {selectedTopicId && !activeTaskId && (
-        <SLLTopicScreen
-          topicId={selectedTopicId}
-          onBackToTopics={() => setSelectedTopicId(null)}
-          onSelectTask={(taskId) => setActiveTaskId(taskId)}
-          completedTasks={completedTasks}
-        />
+        <ErrorBoundary
+          fallbackTitle={`Unable to Load Topic: ${selectedTopic?.title || selectedTopicId}`}
+          onReset={() => setSelectedTopicId(null)}
+          resetButtonText="Return to Topics"
+        >
+          <SLLTopicScreen
+            topicId={selectedTopicId}
+            onBackToTopics={() => setSelectedTopicId(null)}
+            onSelectTask={(taskId) => setActiveTaskId(taskId)}
+            completedTasks={completedTasks}
+          />
+        </ErrorBoundary>
       )}
 
       {/* View 3: Interactive Operation Game Screen */}
       {selectedTopicId && activeTaskId && (
-        <SLLOperationGameScreen
-          taskId={activeTaskId}
-          onBackToMenu={() => setActiveTaskId(null)}
-          onCompleteTask={handleCompleteTask}
-          onSelectLevel={onSelectLevel}
-          onSelectTask={(id) => setActiveTaskId(id)}
-          totalScore={totalScore}
-          topicTitle={selectedTopic?.title}
-          taskTitleOverride={currentTopicTask?.title}
-          taskNumberOverride={currentTopicTask?.taskNumber}
-        />
+        <ErrorBoundary
+          fallbackTitle={`Unable to Load Task: ${currentTopicTask?.title || activeTaskId}`}
+          onReset={() => setActiveTaskId(null)}
+          resetButtonText="Return to Tasks"
+        >
+          <SLLOperationGameScreen
+            taskId={activeTaskId}
+            onBackToMenu={() => setActiveTaskId(null)}
+            onCompleteTask={handleCompleteTask}
+            onSelectLevel={onSelectLevel}
+            onSelectTask={(id) => setActiveTaskId(id)}
+            totalScore={totalScore}
+            topicTitle={selectedTopic?.title}
+            taskTitleOverride={currentTopicTask?.title}
+            taskNumberOverride={currentTopicTask?.taskNumber}
+          />
+        </ErrorBoundary>
       )}
 
       {/* Topic Completion Celebration Modal */}

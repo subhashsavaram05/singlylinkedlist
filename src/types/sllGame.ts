@@ -132,6 +132,9 @@ export interface SLLTaskDef {
     expectedNodesCount?: number;
     expectedNodeNext?: Record<number, number | null>; // address -> nextAddress
     customValidator?: string; // key for custom validation logic
+    nodeCount?: number;
+    headAddress?: number | null;
+    tailAddress?: number | null;
   };
   // Pre-configured input suggestions or initial defaults if appropriate
   defaultInputValues?: {

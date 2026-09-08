@@ -96,7 +96,7 @@ export const SLLInfoPanels: React.FC<SLLInfoPanelsProps> = ({
         </div>
 
         <div className="mt-3 pt-2 border-t border-slate-100 dark:border-blue-900/20 flex items-center justify-between text-[10px] font-mono text-slate-400">
-          <span>Target Nodes: {task.targetCondition?.nodeCount ?? 1}</span>
+          <span>Target Nodes: {task.targetCondition?.nodeCount ?? task.targetCondition?.expectedNodesCount ?? task.targetCondition?.expectedOrder?.length ?? 1}</span>
           <span className="text-emerald-600 dark:text-emerald-400 font-bold">+{task.xpReward} XP</span>
         </div>
       </div>

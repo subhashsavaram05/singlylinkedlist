@@ -58,9 +58,9 @@ export const SLLTeacherBanner: React.FC<SLLTeacherBannerProps> = ({
                   ? `Step ${step.stepNumber} of ${step.totalSteps}: ${step.title}`
                   : 'All Steps Complete!'}
               </h4>
-              {step && step.totalSteps > 1 && (
+              {step && typeof step.totalSteps === 'number' && step.totalSteps > 1 && (
                 <div className="flex items-center gap-1 ml-1.5">
-                  {Array.from({ length: step.totalSteps }).map((_, idx) => {
+                  {Array.from({ length: Math.max(0, Math.floor(step.totalSteps)) }).map((_, idx) => {
                     const stepNum = idx + 1;
                     const isDone = completedSteps.includes(stepNum);
                     const isCurr = step.stepNumber === stepNum && !isTaskComplete;

@@ -29,6 +29,7 @@ import { MyProgressView } from './components/MyProgressView';
 import { QuizView } from './components/QuizView';
 import { QuestCompletionView } from './components/QuestCompletionView';
 import { SingleLinkedListGame } from './components/sll-game/SingleLinkedListGame';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { FieldNotesBackground } from './components/FieldNotesBackground';
 import { GameHintCard } from './components/GameHintCard';
 import { GameLevelGuide } from './components/GameLevelGuide';
@@ -653,15 +654,24 @@ export default function App() {
             {/* 3. GAME PLAY SECTION */}
             {activeTab === 'GAME' && (
               <div className="flex flex-col gap-6 animate-page-enter">
-                <SingleLinkedListGame
-                  onOpenLab={() => setActiveTab('LAB')}
-                  onOpenTheory={() => {
-                    setActiveTheoryTopic('theory-01');
-                    setActiveTab('THEORY');
+                <ErrorBoundary
+                  fallbackTitle="Linked List Game Error"
+                  resetButtonText="Reload Game"
+                  onReset={() => {
+                    setActiveTab('HOME');
+                    setTimeout(() => setActiveTab('GAME'), 50);
                   }}
-                  onOpenQuiz={() => setActiveTab('QUIZ')}
-                  onOpenProgress={() => setActiveTab('PROGRESS')}
-                />
+                >
+                  <SingleLinkedListGame
+                    onOpenLab={() => setActiveTab('LAB')}
+                    onOpenTheory={() => {
+                      setActiveTheoryTopic('theory-01');
+                      setActiveTab('THEORY');
+                    }}
+                    onOpenQuiz={() => setActiveTab('QUIZ')}
+                    onOpenProgress={() => setActiveTab('PROGRESS')}
+                  />
+                </ErrorBoundary>
               </div>
             )}
 
@@ -715,7 +725,7 @@ export default function App() {
             {/* 6. PROGRESS AUDIT SECTION */}
             {activeTab === 'PROGRESS' && (
               <MyProgressView
-                onNavigateToTab={(tab, levelId, chapterId) => {
+                onNavigateToTab={(tab: string, levelId, chapterId) => {
                   if (tab === 'THEORY' || tab === 'LEARN') {
                     if (chapterId) setActiveTheoryTopic(chapterId);
                     setActiveTab('THEORY');

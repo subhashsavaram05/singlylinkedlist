@@ -87,11 +87,17 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
   deletePosition = 2,
 }) => {
   // Check target condition completion in real time for beginner feedback
-  const target = task.targetCondition;
-  const isCountOk = target.nodeCount === undefined || nodes.length === target.nodeCount;
-  const isHeadOk = target.headAddress === undefined || pointers.headAddress === target.headAddress;
-  const isTailOk = target.tailAddress === undefined || pointers.tailAddress === target.tailAddress;
-  const allSteps = getAllTaskSteps(task, nodes, pointers, deletePosition);
+  const target = task?.targetCondition || {};
+  const safeNodes = Array.isArray(nodes) ? nodes : [];
+  const safePointers = pointers && typeof pointers === 'object' ? pointers : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+  const targetExpectedCount = target.nodeCount ?? target.expectedNodesCount ?? target.expectedOrder?.length;
+  const targetExpectedHead = target.headAddress !== undefined ? target.headAddress : target.expectedHead;
+  const targetExpectedTail = target.tailAddress !== undefined ? target.tailAddress : target.expectedTail;
+
+  const isCountOk = targetExpectedCount === undefined || safeNodes.length === targetExpectedCount;
+  const isHeadOk = targetExpectedHead === undefined || safePointers.headAddress === targetExpectedHead;
+  const isTailOk = targetExpectedTail === undefined || safePointers.tailAddress === targetExpectedTail;
+  const allSteps = getAllTaskSteps(task, safeNodes, safePointers, deletePosition);
 
   return (
     <div className="w-full flex flex-col gap-4 font-sans">
@@ -144,30 +150,30 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
             Target Verification Checklist:
           </span>
           <div className="space-y-1 text-xs">
-            {target.nodeCount !== undefined && (
+            {targetExpectedCount !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-slate-600 dark:text-slate-400">Total Nodes in List:</span>
                 <span className={`font-mono font-bold flex items-center gap-1 ${isCountOk ? 'text-emerald-600' : 'text-slate-500'}`}>
                   {isCountOk ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <span className="w-3 h-3 rounded-full border border-slate-400" />}
-                  {nodes.length} / {target.nodeCount}
+                  {safeNodes.length} / {targetExpectedCount}
                 </span>
               </div>
             )}
-            {target.headAddress !== undefined && (
+            {targetExpectedHead !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-slate-600 dark:text-slate-400">HEAD Pointer:</span>
                 <span className={`font-mono font-bold flex items-center gap-1 ${isHeadOk ? 'text-emerald-600' : 'text-slate-500'}`}>
                   {isHeadOk ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <span className="w-3 h-3 rounded-full border border-slate-400" />}
-                  {pointers.headAddress !== null ? pointers.headAddress : 'NULL'} (Target: {target.headAddress !== null ? target.headAddress : 'NULL'})
+                  {safePointers.headAddress !== null ? safePointers.headAddress : 'NULL'} (Target: {targetExpectedHead !== null ? targetExpectedHead : 'NULL'})
                 </span>
               </div>
             )}
-            {target.tailAddress !== undefined && (
+            {targetExpectedTail !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-slate-600 dark:text-slate-400">TAIL Pointer:</span>
                 <span className={`font-mono font-bold flex items-center gap-1 ${isTailOk ? 'text-emerald-600' : 'text-slate-500'}`}>
                   {isTailOk ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <span className="w-3 h-3 rounded-full border border-slate-400" />}
-                  {pointers.tailAddress !== null ? pointers.tailAddress : 'NULL'} (Target: {target.tailAddress !== null ? target.tailAddress : 'NULL'})
+                  {safePointers.tailAddress !== null ? safePointers.tailAddress : 'NULL'} (Target: {targetExpectedTail !== null ? targetExpectedTail : 'NULL'})
                 </span>
               </div>
             )}

@@ -105,9 +105,29 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   const [isConnectingNextMode, setIsConnectingNextMode] = useState<boolean>(false);
 
   // Local RAM State
-  const [nodes, setNodes] = useState<SLLNode[]>(() => JSON.parse(JSON.stringify(activeTask.initialNodes)));
-  const [pointers, setPointers] = useState<SLLPointerState>(() => JSON.parse(JSON.stringify(activeTask.initialPointers)));
-  const [stagedNodes, setStagedNodes] = useState<SLLNode[]>(() => JSON.parse(JSON.stringify(activeTask.initialStagedNodes || [])));
+  const [nodes, setNodes] = useState<SLLNode[]>(() => {
+    try {
+      return Array.isArray(activeTask?.initialNodes) ? JSON.parse(JSON.stringify(activeTask.initialNodes)) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [pointers, setPointers] = useState<SLLPointerState>(() => {
+    try {
+      return activeTask?.initialPointers
+        ? JSON.parse(JSON.stringify(activeTask.initialPointers))
+        : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+    } catch {
+      return { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+    }
+  });
+  const [stagedNodes, setStagedNodes] = useState<SLLNode[]>(() => {
+    try {
+      return Array.isArray(activeTask?.initialStagedNodes) ? JSON.parse(JSON.stringify(activeTask.initialStagedNodes)) : [];
+    } catch {
+      return [];
+    }
+  });
   const [traversalOutput, setTraversalOutput] = useState<number[]>([]);
   const [isTraversing, setIsTraversing] = useState<boolean>(false);
 
@@ -149,8 +169,10 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     setRedoStack([]);
 
     // 2. Reset nodes and pointers to initial fresh list
-    const initialNodes = JSON.parse(JSON.stringify(activeTask.initialNodes));
-    const initialPointers = JSON.parse(JSON.stringify(activeTask.initialPointers));
+    const initialNodes = Array.isArray(activeTask?.initialNodes) ? JSON.parse(JSON.stringify(activeTask.initialNodes)) : [];
+    const initialPointers = activeTask?.initialPointers
+      ? JSON.parse(JSON.stringify(activeTask.initialPointers))
+      : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
     setNodes(initialNodes);
     setPointers(initialPointers);
 
@@ -174,9 +196,11 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
 
   // Reset/Initialize task
   const resetTaskState = () => {
-    const initialNodes = JSON.parse(JSON.stringify(activeTask.initialNodes));
-    const initialPointers = JSON.parse(JSON.stringify(activeTask.initialPointers));
-    const initialStaged = JSON.parse(JSON.stringify(activeTask.initialStagedNodes || []));
+    const initialNodes = Array.isArray(activeTask?.initialNodes) ? JSON.parse(JSON.stringify(activeTask.initialNodes)) : [];
+    const initialPointers = activeTask?.initialPointers
+      ? JSON.parse(JSON.stringify(activeTask.initialPointers))
+      : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+    const initialStaged = Array.isArray(activeTask?.initialStagedNodes) ? JSON.parse(JSON.stringify(activeTask.initialStagedNodes)) : [];
 
     setNodes(initialNodes);
     setPointers(initialPointers);
@@ -715,7 +739,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
 
   // Active Teacher Step for GUIDE & SOLVE mode (real sequential step state machine)
   const currentTeacherStep = getTaskStep(activeTask, currentStep, nodes, pointers, deletePosition);
-  const totalTaskSteps = getTaskTotalSteps(activeTask, deletePosition);
+  const totalTaskSteps = getTaskTotalSteps(activeTask, nodes, pointers, deletePosition);
 
   // Dynamic Node Role Labels for L4_T2 ("Delete at Any Position")
   const nodeRoleLabels = useMemo(() => {

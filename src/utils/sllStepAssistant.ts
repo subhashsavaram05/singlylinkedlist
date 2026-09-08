@@ -2,12 +2,14 @@ import { SLLNode, SLLPointerState, SLLTaskDef, SLLTeacherStep } from '../types/s
 
 // Helper to traverse ordered nodes from HEAD
 function getOrderedNodesList(nodes: SLLNode[] = [], pointers?: SLLPointerState): SLLNode[] {
+  const safeNodes = Array.isArray(nodes) ? nodes : [];
+  const safePointers = pointers && typeof pointers === 'object' ? pointers : undefined;
   const list: SLLNode[] = [];
   const visited = new Set<number>();
-  let curr = pointers?.headAddress ?? (nodes[0] ? nodes[0].address : null);
+  let curr = safePointers?.headAddress ?? (safeNodes[0] ? safeNodes[0].address : null);
   while (curr !== null && !visited.has(curr)) {
     visited.add(curr);
-    const node = nodes.find((n) => n.address === curr);
+    const node = safeNodes.find((n) => n.address === curr);
     if (node) {
       list.push(node);
       curr = node.nextAddress;
@@ -214,17 +216,28 @@ export const TASK_STEP_BUILDERS: Record<
   // LEVEL 02 - TASK 01: Delete from Beginning (HEAD Deletion)
   // ---------------------------------------------------------------------------
   L2_T1: (nodes = [], pointers) => {
-    const chain = getOrderedNodesList(nodes, pointers);
+    const safeNodes = Array.isArray(nodes) ? nodes : [];
+    const safePointers: SLLPointerState =
+      pointers && typeof pointers === 'object'
+        ? {
+            headAddress: pointers.headAddress ?? null,
+            tailAddress: pointers.tailAddress ?? null,
+            currentAddress: pointers.currentAddress ?? null,
+            tempAddress: pointers.tempAddress ?? null,
+            prevAddress: pointers.prevAddress ?? null,
+          }
+        : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+    const chain = getOrderedNodesList(safeNodes, safePointers);
     const headNode =
       chain[0] ||
-      (pointers?.headAddress ? nodes.find((n) => n.address === pointers.headAddress) : null) ||
-      nodes.find((n) => n.address === 1001) ||
-      nodes[0] ||
+      (safePointers?.headAddress ? safeNodes.find((n) => n.address === safePointers.headAddress) : null) ||
+      safeNodes.find((n) => n.address === 1001) ||
+      safeNodes[0] ||
       { id: 'n1', data: 10, address: 1001, nextAddress: 1002 };
     const secondNode =
-      (headNode.nextAddress ? nodes.find((n) => n.address === headNode.nextAddress) : null) ||
+      (headNode.nextAddress ? safeNodes.find((n) => n.address === headNode.nextAddress) : null) ||
       chain[1] ||
-      nodes.find((n) => n.address === 1002) ||
+      safeNodes.find((n) => n.address === 1002) ||
       { id: 'n2', data: 20, address: 1002, nextAddress: 1003 };
 
     return [
@@ -280,18 +293,29 @@ export const TASK_STEP_BUILDERS: Record<
   // LEVEL 02 - TASK 02: Delete from End (TAIL Deletion)
   // ---------------------------------------------------------------------------
   L2_T2: (nodes = [], pointers) => {
-    const chain = getOrderedNodesList(nodes, pointers);
+    const safeNodes = Array.isArray(nodes) ? nodes : [];
+    const safePointers: SLLPointerState =
+      pointers && typeof pointers === 'object'
+        ? {
+            headAddress: pointers.headAddress ?? null,
+            tailAddress: pointers.tailAddress ?? null,
+            currentAddress: pointers.currentAddress ?? null,
+            tempAddress: pointers.tempAddress ?? null,
+            prevAddress: pointers.prevAddress ?? null,
+          }
+        : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+    const chain = getOrderedNodesList(safeNodes, safePointers);
     const lastNode =
-      (pointers?.tailAddress ? nodes.find((n) => n.address === pointers.tailAddress) : null) ||
+      (safePointers?.tailAddress ? safeNodes.find((n) => n.address === safePointers.tailAddress) : null) ||
       chain[chain.length - 1] ||
-      nodes.find((n) => n.address === 1003) ||
-      nodes[nodes.length - 1] ||
+      safeNodes.find((n) => n.address === 1003) ||
+      safeNodes[safeNodes.length - 1] ||
       { id: 'n3', data: 30, address: 1003, nextAddress: null };
     const secondLastNode =
       chain.length >= 2
         ? chain[chain.length - 2]
-        : nodes.find((n) => n.nextAddress === lastNode.address) ||
-          nodes.find((n) => n.address === 1002) ||
+        : safeNodes.find((n) => n.nextAddress === lastNode.address) ||
+          safeNodes.find((n) => n.address === 1002) ||
           { id: 'n2', data: 20, address: 1002, nextAddress: 1003 };
 
     return [
@@ -1149,13 +1173,35 @@ export const TASK_STEP_BUILDERS: Record<
  */
 export function getAllTaskSteps(
   task: SLLTaskDef,
-  nodes: SLLNode[] = [],
+  nodesOrDeletePos: SLLNode[] | number = [],
   pointers: SLLPointerState = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null },
   deletePosition: number = 2
 ): SLLTeacherStep[] {
+  if (!task) return [];
+
+  let safeNodes: SLLNode[] = [];
+  let safePointers: SLLPointerState =
+    pointers && typeof pointers === 'object'
+      ? pointers
+      : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+  let safeDeletePos = deletePosition;
+
+  if (typeof nodesOrDeletePos === 'number') {
+    safeDeletePos = nodesOrDeletePos;
+    safeNodes = Array.isArray(task?.initialNodes) ? JSON.parse(JSON.stringify(task.initialNodes)) : [];
+  } else if (Array.isArray(nodesOrDeletePos)) {
+    safeNodes = nodesOrDeletePos;
+  } else if (Array.isArray(task?.initialNodes)) {
+    safeNodes = JSON.parse(JSON.stringify(task.initialNodes));
+  }
+
   const builder = TASK_STEP_BUILDERS[task.id];
   if (builder) {
-    return builder(nodes, pointers, deletePosition);
+    try {
+      return builder(safeNodes, safePointers, safeDeletePos);
+    } catch (err) {
+      console.warn(`[sllStepAssistant] Builder error for ${task.id}:`, err);
+    }
   }
 
   // Fallback synthesis if task has guideSteps
@@ -1180,9 +1226,9 @@ export function getAllTaskSteps(
     {
       stepNumber: 1,
       totalSteps: 1,
-      title: task.title,
-      what: task.objective,
-      why: task.conceptExplanation,
+      title: task.title || 'Task',
+      what: task.objective || 'Complete task',
+      why: task.conceptExplanation || '',
       actionType: 'check_answer',
       resultMessage: '✓ Task requirements satisfied!',
       nextStepPreview: 'Task Finished!',
@@ -1197,11 +1243,11 @@ export function getAllTaskSteps(
 export function getTaskStep(
   task: SLLTaskDef,
   stepNumber: number,
-  nodes: SLLNode[] = [],
+  nodesOrDeletePos: SLLNode[] | number = [],
   pointers: SLLPointerState = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null },
   deletePosition: number = 2
 ): SLLTeacherStep | null {
-  const steps = getAllTaskSteps(task, nodes, pointers, deletePosition);
+  const steps = getAllTaskSteps(task, nodesOrDeletePos, pointers, deletePosition);
   const found = steps.find((s) => s.stepNumber === stepNumber);
   if (found) return found;
   if (stepNumber >= 1 && stepNumber <= steps.length) {
@@ -1215,11 +1261,11 @@ export function getTaskStep(
  */
 export function getTaskTotalSteps(
   task: SLLTaskDef,
-  nodes: SLLNode[] = [],
+  nodesOrDeletePos: SLLNode[] | number = [],
   pointers: SLLPointerState = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null },
   deletePosition: number = 2
 ): number {
-  const steps = getAllTaskSteps(task, nodes, pointers, deletePosition);
+  const steps = getAllTaskSteps(task, nodesOrDeletePos, pointers, deletePosition);
   return steps.length;
 }
 
@@ -1240,9 +1286,11 @@ export function executeSingleTeacherStep(
   traversalOutput: number[];
   feedbackMessage: string;
 } {
-  let newNodes: SLLNode[] = JSON.parse(JSON.stringify(currentState.nodes));
-  let newPointers: SLLPointerState = { ...currentState.pointers };
-  let newOutput: number[] = [...currentState.traversalOutput];
+  let newNodes: SLLNode[] = Array.isArray(currentState?.nodes) ? JSON.parse(JSON.stringify(currentState.nodes)) : [];
+  let newPointers: SLLPointerState = currentState?.pointers
+    ? { ...currentState.pointers }
+    : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+  let newOutput: number[] = Array.isArray(currentState?.traversalOutput) ? [...currentState.traversalOutput] : [];
 
   switch (step.actionType) {
     case 'create_node': {

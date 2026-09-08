@@ -71,10 +71,10 @@ interface SLLWorkspaceProps {
 }
 
 export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
-  nodes,
-  pointers,
-  stagedNodes,
-  traversalOutput,
+  nodes = [],
+  pointers = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null },
+  stagedNodes = [],
+  traversalOutput = [],
   searchTarget,
   searchResult,
   selectedAddress,

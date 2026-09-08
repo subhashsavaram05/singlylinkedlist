@@ -73,7 +73,7 @@ export const GameHintCard: React.FC<GameHintCardProps> = ({
     }
 
     // Stage 3: Index calculated, checking bucket
-    if (gameState === 'INDEX_FOUND' || gameState === 'DRAGGING_KEY' || gameState === 'CHECKING_SLOT') {
+    if (gameState === 'INDEX_FOUND' || gameState === 'DRAGGING') {
       return {
         stage: 'STEP 2: INSPECT TARGET BUCKET',
         instruction: `The hash function produced index [${calculatedIndex}]. Click bucket [${calculatedIndex}] or drag key ${currentKey} to it. If empty, the key is placed directly.`,
