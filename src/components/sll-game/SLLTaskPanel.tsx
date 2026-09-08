@@ -246,54 +246,64 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
         </div>
       </div>
 
-      {/* Selected Node Inspector (if a node is clicked) */}
-      {selectedNode && (
-        <motion.div
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-[#0B1228] border border-blue-200 dark:border-blue-900/30 rounded-3xl p-4 shadow-xs"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-mono font-bold text-[#2563EB] dark:text-blue-400 flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5" />
-              <span>SELECTED NODE INSPECTOR</span>
-            </span>
-            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#EFF6FF] dark:bg-blue-950 text-[#2563EB] dark:text-blue-300">
-              ADDR: {selectedNode.address}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-[#070B19] border border-slate-200 dark:border-blue-900/20">
-              <span className="text-[9px] text-slate-400 block">DATA VALUE</span>
-              <span className="font-bold text-slate-900 dark:text-white text-sm">{selectedNode.data}</span>
-            </div>
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-[#070B19] border border-slate-200 dark:border-blue-900/20">
-              <span className="text-[9px] text-slate-400 block">NEXT POINTER</span>
-              <span className="font-bold text-[#2563EB] dark:text-blue-400 text-sm">
-                {selectedNode.nextAddress !== null ? selectedNode.nextAddress : 'NULL'}
+      {/* Selected Node Inspector (Stable container to prevent layout shift) */}
+      <div className="bg-white dark:bg-[#0B1228] border border-slate-200 dark:border-blue-900/30 rounded-3xl p-4 shadow-xs min-h-[162px] flex flex-col justify-between">
+        {selectedNode ? (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-mono font-bold text-[#2563EB] dark:text-blue-400 flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5" />
+                <span>SELECTED NODE INSPECTOR</span>
+              </span>
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#EFF6FF] dark:bg-blue-950 text-[#2563EB] dark:text-blue-300">
+                ADDR: {selectedNode.address}
               </span>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => onOpenChangeNext(selectedNode.address)}
-              className="px-2.5 py-1.5 rounded-xl bg-[#EFF6FF] dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/30 text-[#2563EB] dark:text-blue-300 text-xs font-bold hover:bg-[#DBEAFE] flex items-center justify-center gap-1"
-            >
-              <LinkIcon className="w-3 h-3" />
-              <span>Edit NEXT</span>
-            </button>
-            <button
-              onClick={() => onOpenDeleteNode(selectedNode.address)}
-              className="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-100 flex items-center justify-center gap-1"
-            >
-              <Trash2 className="w-3 h-3" />
-              <span>Delete Node</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
+              <div className="p-2 rounded-xl bg-slate-50 dark:bg-[#070B19] border border-slate-200 dark:border-blue-900/20">
+                <span className="text-[9px] text-slate-400 block">DATA VALUE</span>
+                <span className="font-bold text-slate-900 dark:text-white text-sm">{selectedNode.data}</span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-50 dark:bg-[#070B19] border border-slate-200 dark:border-blue-900/20">
+                <span className="text-[9px] text-slate-400 block">NEXT POINTER</span>
+                <span className="font-bold text-[#2563EB] dark:text-blue-400 text-sm">
+                  {selectedNode.nextAddress !== null ? selectedNode.nextAddress : 'NULL'}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenChangeNext(selectedNode.address)}
+                className="px-2.5 py-1.5 rounded-xl bg-[#EFF6FF] dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/30 text-[#2563EB] dark:text-blue-300 text-xs font-bold hover:bg-[#DBEAFE] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <LinkIcon className="w-3 h-3" />
+                <span>Edit NEXT</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenDeleteNode(selectedNode.address)}
+                className="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-100 flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Delete Node</span>
+              </button>
+            </div>
           </div>
-        </motion.div>
-      )}
+        ) : (
+          <div className="flex flex-col items-center justify-center text-center my-auto py-2">
+            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-blue-950/60 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-2">
+              <Layers className="w-4 h-4" />
+            </div>
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 font-mono">NODE INSPECTOR</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 max-w-[220px]">
+              Select any node in RAM to inspect its memory address, value, and NEXT pointer.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Traversal Step Guide & Output Stream (Level 3 / Mission 7) */}
       {(task.targetCondition.customValidator === 'L3_TRAVERSAL_COMPLETE' || task.id === 'L3_T1') && (

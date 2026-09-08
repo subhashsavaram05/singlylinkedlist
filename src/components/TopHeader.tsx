@@ -30,6 +30,7 @@ export interface TopHeaderProps {
   onOpenSettingsModal?: () => void;
   isDesktopSidebarOpen?: boolean;
   isMobileSidebarOpen?: boolean;
+  onNavigateHome?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -47,6 +48,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onToggleMobileSidebar,
   isDesktopSidebarOpen = true,
   isMobileSidebarOpen = false,
+  onNavigateHome,
 }) => {
   const { theme, toggleTheme } = useTheme();
 
@@ -75,9 +77,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const pageName = getPageName();
   const isGameMode = activeTab === 'GAME' || activeTab === 'QUEST';
 
+  // Hamburger button and TopHeader Logo share the exact same visibility rules:
+  // When sidebar is OPEN -> HIDE from main header (logo is placed inside sidebar header instead)
+  // When sidebar is CLOSED -> SHOW in main header (hamburger + logo + title)
   const showHamburgerDesktop = !isDesktopSidebarOpen;
   const showHamburgerMobile = !isMobileSidebarOpen;
-  const hamburgerVisibilityClass =
+  const showOnSidebarClosedClass =
     showHamburgerDesktop && showHamburgerMobile
       ? 'flex'
       : showHamburgerDesktop && !showHamburgerMobile
@@ -94,33 +99,45 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       } z-20 h-14 sm:h-16 bg-white dark:bg-[#070B18]/95 border-b border-slate-200 dark:border-blue-900/30 shadow-xs backdrop-blur-md transition-all duration-300 flex items-center m-0 p-0`}
     >
       <div className="max-w-7xl w-full mx-auto h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4">
-        {/* Left Side: 1. Menu Button (when sidebar is closed) -> 2. AlgoLearn Logo (when sidebar closed or on mobile) -> 3. Current Section */}
+        {/* Left Side:
+            When sidebar is CLOSED: [☰] [AlgoLearn Logo] | [Page Title]
+            When sidebar is OPEN:   [Page Title] (NO duplicate logo, NO hamburger)
+        */}
         <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
           {/* 1. THREE-BAR MENU / HAMBURGER BUTTON (Strictly visible ONLY when navigation sidebar is CLOSED) */}
           <button
             id="btn-sidebar-toggle"
             onClick={onToggleMobileSidebar}
-            className={`p-1.5 sm:p-2 text-slate-600 dark:text-blue-300 hover:text-slate-900 dark:hover:text-white bg-slate-100/80 dark:bg-blue-950/40 hover:bg-slate-200/80 dark:hover:bg-blue-900/50 border border-slate-200 dark:border-blue-900/40 rounded-xl transition-all duration-150 cursor-pointer shrink-0 shadow-xs items-center justify-center ${hamburgerVisibilityClass}`}
+            className={`p-1.5 sm:p-2 text-slate-600 dark:text-blue-300 hover:text-slate-900 dark:hover:text-white bg-slate-100/80 dark:bg-blue-950/40 hover:bg-slate-200/80 dark:hover:bg-blue-900/50 border border-slate-200 dark:border-blue-900/40 rounded-xl transition-all duration-150 cursor-pointer shrink-0 shadow-xs items-center justify-center ${showOnSidebarClosedClass}`}
             title="Open Navigation Menu (☰)"
             aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* 2. ALGOLEARN LOGO (Visible on mobile drawer or when desktop sidebar is closed) */}
-          <div className={`items-center shrink-0 ${isDesktopSidebarOpen ? 'flex lg:hidden' : 'flex'}`}>
-            <AlgoLearnLogo theme={theme} className="h-8 sm:h-9 w-auto" />
+          {/* 2. ALGOLEARN LOGO (Strictly visible ONLY when navigation sidebar is CLOSED - NEVER DUPLICATED) */}
+          <div className={`items-center shrink-0 ${showOnSidebarClosedClass}`}>
+            <AlgoLearnLogo
+              theme={theme}
+              onClick={onNavigateHome}
+              className="h-8 sm:h-9 w-auto"
+              imgClassName="h-7 sm:h-8 w-auto"
+            />
           </div>
 
-          {/* 3. CURRENT PAGE / SECTION */}
+          {/* 3. CURRENT PAGE TITLE */}
           <div
-            className={`items-center gap-2 min-w-0 ${
+            className={`flex items-center gap-2 min-w-0 ${
               isDesktopSidebarOpen
-                ? 'flex'
-                : 'hidden xs:flex pl-2.5 sm:pl-3 border-l border-slate-200 dark:border-blue-900/30'
+                ? 'lg:pl-0 lg:border-l-0'
+                : 'lg:pl-3 lg:border-l lg:border-slate-200 lg:dark:border-blue-900/30'
+            } ${
+              isMobileSidebarOpen
+                ? 'pl-0 border-l-0'
+                : 'pl-2.5 sm:pl-3 border-l border-slate-200 dark:border-blue-900/30'
             }`}
           >
-            <span className="text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 font-sans tracking-wide leading-none truncate">
+            <span className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white font-sans tracking-tight leading-none truncate">
               {pageName}
             </span>
           </div>

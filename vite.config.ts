@@ -17,7 +17,6 @@ export default defineConfig(() => {
       allowedHosts: true as const,
       headers: {
         'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'SAMEORIGIN',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
       },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
@@ -31,7 +30,6 @@ export default defineConfig(() => {
     preview: {
       headers: {
         'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'SAMEORIGIN',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
       },
     },

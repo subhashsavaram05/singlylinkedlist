@@ -111,10 +111,15 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       id="app-sidebar-navigation"
       className="w-64 h-full h-[100vh] min-h-[100vh] flex flex-col bg-white dark:bg-[#070B18] border-r border-slate-200 dark:border-blue-900/30 select-none shadow-xs transition-colors duration-300 m-0 p-0"
     >
-      {/* Top Sidebar Header with Brand & Close Button - Aligned with TopHeader height */}
-      <div className="h-14 sm:h-16 px-3.5 sm:px-4 border-b border-slate-200 dark:border-blue-900/25 flex items-center justify-between shrink-0 bg-white dark:bg-[#070B18] m-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <AlgoLearnLogo theme={theme} className="h-7 sm:h-8 w-auto" />
+      {/* Top Sidebar Header with Brand Logo (left) & Close Button (right) - Aligned with TopHeader height */}
+      <div className="h-14 sm:h-16 px-4 border-b border-slate-200 dark:border-blue-900/30 flex items-center justify-between shrink-0 bg-white dark:bg-[#070B18] m-0">
+        <div className="flex items-center min-w-0 pr-2">
+          <AlgoLearnLogo
+            theme={theme}
+            onClick={() => handleSelect('HOME')}
+            className="h-8 w-auto"
+            imgClassName="h-7 sm:h-8 w-auto"
+          />
         </div>
         {/* Close Button in Top-Right Corner of Navigation */}
         <button
@@ -124,7 +129,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           aria-label="Close navigation menu"
           title="Close Navigation (✕)"
         >
-          <X className="w-4.5 h-4.5" />
+          <X className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
         </button>
       </div>
 

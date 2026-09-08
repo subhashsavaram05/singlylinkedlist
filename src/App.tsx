@@ -57,34 +57,6 @@ export default function App() {
     }
   };
 
-  // Close sidebar on outside click across desktop and mobile
-  useEffect(() => {
-    const handleDocumentClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-
-      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
-      const isSidebarOpen = isDesktop ? desktopSidebarOpen : mobileSidebarOpen;
-      if (!isSidebarOpen) return;
-
-      const isInsideSidebar = target.closest('#app-sidebar-container') || target.closest('#app-sidebar-navigation');
-      const isToggleButton = target.closest('#btn-sidebar-toggle');
-
-      if (!isInsideSidebar && !isToggleButton) {
-        if (isDesktop) {
-          setDesktopSidebarOpen(false);
-        } else {
-          setMobileSidebarOpen(false);
-        }
-      }
-    };
-
-    document.addEventListener('click', handleDocumentClick);
-    return () => {
-      document.removeEventListener('click', handleDocumentClick);
-    };
-  }, [desktopSidebarOpen, mobileSidebarOpen]);
-
   // Game Configuration State
   const [currentLevelIndex, setCurrentLevelIndex] = useState<number>(0);
   const [completedLevels, setCompletedLevels] = useState<number[]>(() => {
@@ -576,6 +548,7 @@ export default function App() {
           onToggleMobileSidebar={handleToggleSidebar}
           isDesktopSidebarOpen={desktopSidebarOpen}
           isMobileSidebarOpen={mobileSidebarOpen}
+          onNavigateHome={() => setActiveTab('HOME')}
         />
 
         {/* Page Main Content Container */}

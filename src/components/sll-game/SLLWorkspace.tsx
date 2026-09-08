@@ -118,25 +118,9 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [scaleFactor, setScaleFactor] = useState<number>(1);
   const [draggingFromAddr, setDraggingFromAddr] = useState<number | null>(null);
   const [dragOverAddr, setDragOverAddr] = useState<number | null>(null);
   const [isDragOverNull, setIsDragOverNull] = useState<boolean>(false);
-
-  // Auto-scroll to center current, expected, or target node in workspace
-  useEffect(() => {
-    const targetAddr =
-      traversalNextExpectedAddr ??
-      (highlightAddresses && highlightAddresses.length === 1 ? highlightAddresses[0] : null) ??
-      pointers.currentAddress ??
-      guideTargetAddress;
-    if (targetAddr !== null && targetAddr !== undefined) {
-      const el = document.getElementById(`sll-node-${targetAddr}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      }
-    }
-  }, [isTraversalTask, traversalNextExpectedAddr, pointers.currentAddress, highlightAddresses, guideTargetAddress]);
 
   // Local mode state fallbacks if parent doesn't manage them directly
   const [localHeadMode, setLocalHeadMode] = useState<boolean>(false);
@@ -294,40 +278,6 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
     }
   };
 
-  // Responsive scale observer
-  useEffect(() => {
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      const containerWidth = containerRef.current.clientWidth - 32;
-      const totalCount = primaryStageNodes.length + (primaryStageNodes.length > 0 ? 1 : 0);
-      if (totalCount === 0) {
-        setScaleFactor(1);
-        return;
-      }
-
-      const nodeWidth = totalCount >= 6 ? 110 : totalCount >= 4 ? 124 : 142;
-      const gapWidth = 18;
-      const requiredWidth = totalCount * (nodeWidth + gapWidth) + 80;
-
-      if (containerWidth < requiredWidth && containerWidth > 0) {
-        const factor = Math.max(0.55, Math.min(1, containerWidth / requiredWidth));
-        setScaleFactor(factor);
-      } else {
-        setScaleFactor(1);
-      }
-    };
-
-    handleResize();
-    const observer = new ResizeObserver(handleResize);
-    if (containerRef.current) observer.observe(containerRef.current);
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [primaryStageNodes.length, secondaryUnlinkedNodes.length]);
-
   // Reusable node card renderer
   const renderNodeCard = (node: SLLNode, isMainRow: boolean) => {
     const isHead = pointers.headAddress === node.address;
@@ -365,10 +315,9 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
         {/* Floating CURRENT Pointer */}
         {isCurrent && !isExpectedNextNode && (
           <motion.div
-            layoutId="sll-current-pointer"
-            initial={{ y: -8, opacity: 0 }}
+            initial={{ y: -6, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none whitespace-nowrap"
+            className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none whitespace-nowrap transition-transform duration-150"
           >
             <div className="px-2.5 py-0.5 rounded-full bg-cyan-500 text-white text-[9px] font-mono font-bold shadow-md shadow-cyan-500/40 flex items-center gap-1">
               <Eye className="w-3 h-3" />
@@ -509,7 +458,7 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
               ? 'border-slate-300 dark:border-blue-900/40 bg-white dark:bg-[#0E1736] opacity-60 hover:opacity-100 hover:scale-[1.01]'
               : 'border-slate-300 dark:border-blue-900/40 bg-white dark:bg-[#0E1736] hover:border-blue-400 dark:hover:border-blue-400 hover:shadow-md hover:scale-[1.02]'
           }`}
-          style={{ minWidth: '136px' }}
+          style={{ minWidth: '136px', width: '136px' }}
         >
           {/* Node Header: NODE | ADDR */}
           <div className="bg-slate-100 dark:bg-[#152148] px-2.5 py-1 border-b border-slate-200 dark:border-blue-900/30 flex items-center justify-between text-[10px] font-mono">
@@ -728,7 +677,7 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
     <div
       id="sll-interactive-workspace"
       ref={containerRef}
-      className="w-full bg-white dark:bg-[#0B1228] border border-slate-200 dark:border-blue-900/30 rounded-3xl p-4 sm:p-5 shadow-xs dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] relative overflow-hidden flex flex-col justify-between min-h-[360px] font-sans"
+      className="w-full bg-white dark:bg-[#0B1228] border border-slate-200 dark:border-blue-900/30 rounded-3xl p-4 sm:p-5 shadow-xs dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] relative overflow-hidden flex flex-col justify-between min-h-[420px] font-sans"
     >
       {/* Background Grid Pattern */}
       <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:20px_20px] opacity-40 dark:opacity-15 pointer-events-none" />
@@ -972,7 +921,7 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
       )}
 
       {/* 4. NODE WORKSPACE STAGE */}
-      <div className="my-3 relative z-10 flex flex-col items-center justify-center min-h-[190px] w-full">
+      <div className="my-3 relative z-10 flex flex-col items-center justify-center min-h-[260px] w-full">
         {nodes.length === 0 ? (
           <div className="text-center py-8 px-4 border-2 border-dashed border-slate-300 dark:border-blue-900/30 rounded-2xl w-full max-w-md bg-slate-50/50 dark:bg-blue-950/20">
             <div className="w-10 h-10 mx-auto rounded-full bg-slate-200 dark:bg-blue-900/40 flex items-center justify-center text-slate-400 dark:text-blue-300 mb-2">
@@ -990,7 +939,7 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
             {/* Full horizontal visibility row: auto-scrolls without clipping first or last nodes */}
             <div
               ref={scrollContainerRef}
-              className="w-full overflow-x-auto overflow-y-visible scroll-smooth pt-14 pb-12 px-6 sm:px-10"
+              className="w-full overflow-x-auto overflow-y-visible pt-14 pb-12 px-6 sm:px-10"
             >
               <div className="min-w-max mx-auto flex items-center justify-start flex-nowrap gap-2 sm:gap-3">
                 {/* Explicit HEAD Pointer Leader: HEAD → [First Node] */}
@@ -1020,7 +969,7 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
                   </button>
                 )}
 
-                <AnimatePresence mode="popLayout">
+                <AnimatePresence>
                   {primaryStageNodes.map((node) => renderNodeCard(node, true))}
                 </AnimatePresence>
 

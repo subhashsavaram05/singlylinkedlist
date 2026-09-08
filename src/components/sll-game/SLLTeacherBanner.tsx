@@ -142,19 +142,14 @@ export const SLLTeacherBanner: React.FC<SLLTeacherBannerProps> = ({
           )}
 
           {/* Last Step Result (if any) */}
-          <AnimatePresence>
-            {lastActionResult && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="p-2.5 rounded-xl bg-emerald-100/90 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-500/40 text-emerald-900 dark:text-emerald-200 text-xs font-medium flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{lastActionResult}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {lastActionResult && (
+            <div
+              className="p-2.5 rounded-xl bg-emerald-100/90 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-500/40 text-emerald-900 dark:text-emerald-200 text-xs font-medium flex items-center gap-2 transition-all duration-150"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{lastActionResult}</span>
+            </div>
+          )}
 
           {/* Action Trigger Row */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">

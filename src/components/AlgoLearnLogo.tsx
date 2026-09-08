@@ -3,12 +3,14 @@ import React from 'react';
 export interface AlgoLearnLogoProps {
   theme?: 'light' | 'dark';
   className?: string;
+  imgClassName?: string;
   onClick?: () => void;
 }
 
 export const AlgoLearnLogo: React.FC<AlgoLearnLogoProps> = ({
   theme = 'light',
-  className = 'h-8 sm:h-9 w-auto',
+  className = '',
+  imgClassName = 'h-8 sm:h-9',
   onClick,
 }) => {
   const isDark = theme === 'dark';
@@ -23,7 +25,7 @@ export const AlgoLearnLogo: React.FC<AlgoLearnLogoProps> = ({
       <img
         src={isDark ? '/algolearn-logo-dark.png' : '/algolearn-logo.png'}
         alt="AlgoLearn - YOUR DSA JOURNEY"
-        className="h-8 sm:h-9 w-auto object-contain select-none pointer-events-none"
+        className={`${imgClassName} w-auto object-contain select-none pointer-events-none`}
         draggable={false}
       />
     </div>
