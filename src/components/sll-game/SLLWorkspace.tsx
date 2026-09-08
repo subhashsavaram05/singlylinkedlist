@@ -40,6 +40,8 @@ interface SLLWorkspaceProps {
   isSearching: boolean;
   levelId: number;
   guideTargetAddress?: number | null;
+  highlightAddresses?: number[] | null;
+  detachedAddress?: number | null;
   pendingConnectFrom?: number | null;
   isSettingHeadMode?: boolean;
   isSettingTailMode?: boolean;
@@ -53,6 +55,11 @@ interface SLLWorkspaceProps {
   wrongClickedAddress?: number | null;
   onNodeClickDirect?: (address: number) => void;
   onCancelDirectMode?: () => void;
+  // Traversal interaction props:
+  isTraversalTask?: boolean;
+  traversalNextExpectedAddr?: number | null;
+  onTraversalNullClick?: () => void;
+  nodeRoleLabels?: Record<number, string>;
   // Toolbar action handlers:
   onCreateNode?: () => void;
   onOpenCreateNodeModal?: () => void;
@@ -82,6 +89,8 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
   isSearching,
   levelId,
   guideTargetAddress,
+  highlightAddresses = null,
+  detachedAddress = null,
   pendingConnectFrom = null,
   isSettingHeadMode = false,
   isSettingTailMode = false,
@@ -95,6 +104,9 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
   wrongClickedAddress,
   onNodeClickDirect,
   onCancelDirectMode,
+  isTraversalTask = false,
+  traversalNextExpectedAddr = null,
+  onTraversalNullClick,
   onCreateNode,
   onOpenCreateNodeModal,
   onToggleHeadMode,
@@ -102,12 +114,29 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
   onToggleNextMode,
   onToggleDeleteMode,
   onSetNextToNull,
+  nodeRoleLabels,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [scaleFactor, setScaleFactor] = useState<number>(1);
   const [draggingFromAddr, setDraggingFromAddr] = useState<number | null>(null);
   const [dragOverAddr, setDragOverAddr] = useState<number | null>(null);
   const [isDragOverNull, setIsDragOverNull] = useState<boolean>(false);
+
+  // Auto-scroll to center current, expected, or target node in workspace
+  useEffect(() => {
+    const targetAddr =
+      traversalNextExpectedAddr ??
+      (highlightAddresses && highlightAddresses.length === 1 ? highlightAddresses[0] : null) ??
+      pointers.currentAddress ??
+      guideTargetAddress;
+    if (targetAddr !== null && targetAddr !== undefined) {
+      const el = document.getElementById(`sll-node-${targetAddr}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [isTraversalTask, traversalNextExpectedAddr, pointers.currentAddress, highlightAddresses, guideTargetAddress]);
 
   // Local mode state fallbacks if parent doesn't manage them directly
   const [localHeadMode, setLocalHeadMode] = useState<boolean>(false);
@@ -307,12 +336,50 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
     const isSelected = selectedAddress === node.address;
     const isSearchMatch = searchResult === 'found' && node.data === searchTarget;
     const isSourceForNext = effectiveConnectFrom === node.address;
-    const isTarget = guideTargetAddress === node.address;
+    
+    // Strict highlight system: if highlightAddresses is defined & non-empty, ONLY nodes in it are highlighted
+    const hasHighlightFilter = Boolean(highlightAddresses && highlightAddresses.length > 0);
+    const isHighlightedByFilter = hasHighlightFilter ? highlightAddresses!.includes(node.address) : false;
+    const isTarget = hasHighlightFilter ? isHighlightedByFilter : guideTargetAddress === node.address;
+    const isDetached = detachedAddress === node.address;
+    const isExpectedNextNode = Boolean(isTraversalTask && traversalNextExpectedAddr === node.address);
 
     return (
       <div key={node.id || node.address} className="flex items-center shrink-0 relative">
+        {/* Floating Expected Next Node Banner */}
+        {isExpectedNextNode && (
+          <motion.div
+            initial={{ y: -8, opacity: 0 }}
+            animate={{ y: [-3, 1, -3], opacity: 1 }}
+            transition={{ repeat: Infinity, duration: 1.2 }}
+            className="absolute -top-12 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none whitespace-nowrap"
+          >
+            <div className="px-2.5 py-0.5 rounded-full bg-cyan-500 text-white text-[9px] font-mono font-bold shadow-lg shadow-cyan-500/40 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              <span>{pointers.currentAddress === null ? 'Select HEAD Node' : 'Select Next Node'}</span>
+            </div>
+            <ArrowDown className="w-3.5 h-3.5 text-cyan-500 stroke-[3]" />
+          </motion.div>
+        )}
+
+        {/* Floating CURRENT Pointer */}
+        {isCurrent && !isExpectedNextNode && (
+          <motion.div
+            layoutId="sll-current-pointer"
+            initial={{ y: -8, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none whitespace-nowrap"
+          >
+            <div className="px-2.5 py-0.5 rounded-full bg-cyan-500 text-white text-[9px] font-mono font-bold shadow-md shadow-cyan-500/40 flex items-center gap-1">
+              <Eye className="w-3 h-3" />
+              <span>CURRENT</span>
+            </div>
+            <ArrowDown className="w-3 h-3 text-cyan-500 animate-pulse stroke-[3]" />
+          </motion.div>
+        )}
+
         {/* Floating HEAD Banner above node */}
-        {isHead && (
+        {isHead && !isCurrent && !isExpectedNextNode && (
           <motion.div
             initial={{ y: -6, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -326,7 +393,7 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
         )}
 
         {/* Floating TAIL Banner below node */}
-        {isTail && (
+        {isTail && !isCurrent && !isExpectedNextNode && (
           <motion.div
             initial={{ y: 6, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -339,34 +406,53 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
           </motion.div>
         )}
 
-        {/* Guide Target Indicator */}
-        {isTarget && (
+        {/* Guide Target / Detached / Role Label Indicator */}
+        {(isTarget || isDetached || (nodeRoleLabels && nodeRoleLabels[node.address])) && !isCurrent && !isExpectedNextNode && (
           <motion.div
             initial={{ y: -10, opacity: 0 }}
             animate={{ y: [-4, 0, -4], opacity: 1 }}
             transition={{ repeat: Infinity, duration: 1.2 }}
             className="absolute -top-12 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none"
           >
-            <div className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[9px] font-bold shadow-lg shadow-amber-500/40 flex items-center gap-1 whitespace-nowrap">
-              <Sparkles className="w-3 h-3 text-slate-950" />
-              <span>TARGET NODE</span>
+            <div
+              className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold shadow-lg flex items-center gap-1 whitespace-nowrap ${
+                isDetached
+                  ? 'bg-rose-500 text-white shadow-rose-500/40'
+                  : nodeRoleLabels?.[node.address] === 'PREVIOUS'
+                  ? 'bg-[#2563EB] text-white shadow-blue-500/40'
+                  : nodeRoleLabels?.[node.address] === 'NEXT'
+                  ? 'bg-cyan-600 text-white shadow-cyan-600/40'
+                  : 'bg-amber-500 text-slate-950 shadow-amber-500/40'
+              }`}
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>
+                {isDetached
+                  ? 'DETACHED NODE'
+                  : nodeRoleLabels?.[node.address] === 'PREVIOUS'
+                  ? 'PREVIOUS NODE'
+                  : nodeRoleLabels?.[node.address] === 'NEXT'
+                  ? 'NEXT NODE'
+                  : nodeRoleLabels?.[node.address] === 'TARGET'
+                  ? 'TARGET NODE'
+                  : node.address === pointers.headAddress
+                  ? 'HEAD NODE'
+                  : node.address === pointers.tailAddress
+                  ? 'LAST NODE'
+                  : 'TARGET NODE'}
+              </span>
             </div>
-            <ArrowDown className="w-3.5 h-3.5 text-amber-500 font-bold stroke-[3]" />
-          </motion.div>
-        )}
-
-        {/* Floating CURRENT Pointer */}
-        {isCurrent && (
-          <motion.div
-            initial={{ y: -8, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none"
-          >
-            <div className="px-2 py-0.5 rounded-full bg-cyan-500 text-white text-[9px] font-mono font-bold shadow-md shadow-cyan-500/40 flex items-center gap-1 whitespace-nowrap">
-              <Eye className="w-3 h-3" />
-              <span>CURRENT</span>
-            </div>
-            <ArrowDown className="w-3 h-3 text-cyan-500 animate-pulse stroke-[3]" />
+            <ArrowDown
+              className={`w-3.5 h-3.5 font-bold stroke-[3] ${
+                isDetached
+                  ? 'text-rose-500'
+                  : nodeRoleLabels?.[node.address] === 'PREVIOUS'
+                  ? 'text-[#2563EB]'
+                  : nodeRoleLabels?.[node.address] === 'NEXT'
+                  ? 'text-cyan-600'
+                  : 'text-amber-500'
+              }`}
+            />
           </motion.div>
         )}
 
@@ -391,7 +477,9 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
           }}
           onClick={() => handleNodeClick(node.address)}
           className={`relative flex flex-col rounded-2xl border-2 transition-all duration-200 cursor-pointer select-none overflow-hidden group shadow-xs ${
-            effectiveDeleteMode
+            isDetached
+              ? 'border-rose-500 ring-4 ring-rose-400/40 bg-rose-50/50 dark:bg-rose-950/40 scale-105'
+              : effectiveDeleteMode && (!hasHighlightFilter || isTarget)
               ? 'border-rose-500 ring-4 ring-rose-400/40 bg-rose-50/40 dark:bg-rose-950/30 scale-[1.02]'
               : isSourceForNext
               ? 'border-[#2563EB] ring-4 ring-blue-500/50 bg-[#EFF6FF]/70 dark:bg-blue-950/40 scale-105 shadow-md'
@@ -399,18 +487,26 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
               ? 'border-emerald-500 ring-4 ring-emerald-400/50 bg-emerald-50 dark:bg-emerald-950/30 animate-pulse'
               : dragOverAddr === node.address
               ? 'border-emerald-500 ring-4 ring-emerald-400/50 bg-emerald-50 dark:bg-emerald-950/40 scale-105'
-              : effectiveHeadMode
+              : effectiveHeadMode && (!hasHighlightFilter || isTarget)
               ? 'border-cyan-500 ring-4 ring-cyan-400/40 bg-cyan-50/40 dark:bg-cyan-950/30 scale-[1.02]'
-              : effectiveTailMode
+              : effectiveTailMode && (!hasHighlightFilter || isTarget)
               ? 'border-amber-500 ring-4 ring-amber-400/40 bg-amber-50/40 dark:bg-amber-950/30 scale-[1.02]'
-              : isTarget
-              ? 'border-amber-400 ring-4 ring-amber-400/40 bg-amber-50/50 dark:bg-amber-950/30 scale-105'
-              : isSearchMatch
-              ? 'border-emerald-500 ring-4 ring-emerald-500/30 shadow-lg bg-emerald-50 dark:bg-emerald-950/40'
+              : isExpectedNextNode
+              ? 'border-cyan-500 ring-4 ring-cyan-400/60 bg-cyan-50/60 dark:bg-cyan-950/40 scale-105 animate-pulse shadow-md shadow-cyan-500/20'
               : isCurrent
               ? 'border-cyan-500 ring-4 ring-cyan-500/30 shadow-lg bg-cyan-50/50 dark:bg-cyan-950/30 scale-105'
+              : isTarget
+              ? 'border-amber-400 ring-4 ring-amber-400/50 bg-amber-50/50 dark:bg-amber-950/30 scale-105 shadow-md shadow-amber-500/20'
+              : nodeRoleLabels?.[node.address] === 'PREVIOUS'
+              ? 'border-[#2563EB] ring-4 ring-blue-500/40 bg-blue-50/50 dark:bg-blue-950/30 scale-105 shadow-md shadow-blue-500/20'
+              : nodeRoleLabels?.[node.address] === 'NEXT'
+              ? 'border-cyan-500 ring-4 ring-cyan-500/40 bg-cyan-50/50 dark:bg-cyan-950/30 scale-105 shadow-md shadow-cyan-500/20'
+              : isSearchMatch
+              ? 'border-emerald-500 ring-4 ring-emerald-500/30 shadow-lg bg-emerald-50 dark:bg-emerald-950/40'
               : isSelected
               ? 'border-[#2563EB] dark:border-blue-400 ring-4 ring-blue-500/25 shadow-md bg-blue-50/40 dark:bg-blue-950/30'
+              : hasHighlightFilter && !isHighlightedByFilter
+              ? 'border-slate-300 dark:border-blue-900/40 bg-white dark:bg-[#0E1736] opacity-60 hover:opacity-100 hover:scale-[1.01]'
               : 'border-slate-300 dark:border-blue-900/40 bg-white dark:bg-[#0E1736] hover:border-blue-400 dark:hover:border-blue-400 hover:shadow-md hover:scale-[1.02]'
           }`}
           style={{ minWidth: '136px' }}
@@ -450,14 +546,17 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
               <div className="flex items-center gap-1">
                 <span
                   onClick={(e) => {
+                    if (isTraversalTask) return;
                     e.stopPropagation();
                     onOpenChangeNext(node.address);
                   }}
-                  title="Click to edit NEXT pointer"
-                  className={`font-bold px-1.5 py-0.5 rounded text-[11px] font-mono cursor-pointer transition-colors ${
+                  title={isTraversalTask ? `NEXT = ${node.nextAddress ?? 'NULL'}` : "Click to edit NEXT pointer"}
+                  className={`font-bold px-1.5 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                    isTraversalTask ? 'cursor-pointer' : 'cursor-pointer hover:bg-blue-100'
+                  } ${
                     node.nextAddress !== null
-                      ? 'bg-[#EFF6FF] dark:bg-blue-950 text-[#2563EB] dark:text-blue-300 border border-blue-200 dark:border-blue-900/40 hover:bg-blue-100'
-                      : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 hover:bg-rose-200'
+                      ? 'bg-[#EFF6FF] dark:bg-blue-950 text-[#2563EB] dark:text-blue-300 border border-blue-200 dark:border-blue-900/40'
+                      : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
                   }`}
                 >
                   {node.nextAddress !== null ? node.nextAddress : 'NULL'}
@@ -465,8 +564,9 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
 
                 {/* Visible NEXT Draggable Connector Dot */}
                 <div
-                  draggable
+                  draggable={!isTraversalTask}
                   onDragStart={(e) => {
+                    if (isTraversalTask) return;
                     e.stopPropagation();
                     e.dataTransfer.setData('text/plain', String(node.address));
                     setDraggingFromAddr(node.address);
@@ -475,8 +575,8 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
                     setDraggingFromAddr(null);
                     setDragOverAddr(null);
                   }}
-                  title="Drag NEXT → to destination node"
-                  className="w-3.5 h-3.5 rounded-full bg-[#6366F1] hover:bg-[#4F46E5] text-white flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-125 transition-transform shadow-xs shrink-0"
+                  title={isTraversalTask ? "Follow NEXT to traverse" : "Drag NEXT → to destination node"}
+                  className="w-3.5 h-3.5 rounded-full bg-[#6366F1] hover:bg-[#4F46E5] text-white flex items-center justify-center cursor-pointer active:cursor-grabbing hover:scale-125 transition-transform shadow-xs shrink-0"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white block" />
                 </div>
@@ -485,19 +585,19 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
           </div>
 
           {/* Active Tool Action Overlays */}
-          {effectiveDeleteMode && (
+          {effectiveDeleteMode && (!hasHighlightFilter || isTarget) && (
             <div className="bg-rose-600 text-white text-[9px] font-mono font-bold py-1 px-1 text-center flex items-center justify-center gap-1 animate-pulse">
               <Trash2 className="w-2.5 h-2.5" />
               <span>CLICK TO DELETE</span>
             </div>
           )}
-          {effectiveHeadMode && (
+          {effectiveHeadMode && (!hasHighlightFilter || isTarget) && (
             <div className="bg-cyan-600 text-white text-[9px] font-mono font-bold py-1 px-1 text-center flex items-center justify-center gap-1 animate-pulse">
               <ArrowDown className="w-2.5 h-2.5" />
               <span>SELECT AS HEAD</span>
             </div>
           )}
-          {effectiveTailMode && (
+          {effectiveTailMode && (!hasHighlightFilter || isTarget) && (
             <div className="bg-amber-500 text-slate-950 font-mono font-bold py-1 px-1 text-center flex items-center justify-center gap-1 animate-pulse text-[9px]">
               <ArrowUp className="w-2.5 h-2.5" />
               <span>SELECT AS TAIL</span>
@@ -525,9 +625,27 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
         {isMainRow && (
           <div className="flex items-center px-1.5 shrink-0">
             {node.nextAddress !== null ? (
-              <div className="flex items-center text-[#2563EB] dark:text-blue-400">
-                <div className="w-4 sm:w-8 h-[2px] bg-[#2563EB] dark:bg-blue-400" />
-                <ArrowRight className="w-4 h-4 -ml-1.5 text-[#2563EB] dark:text-blue-400 shrink-0 stroke-[2.5]" />
+              <div
+                className={`flex items-center transition-all ${
+                  isCurrent && isTraversalTask
+                    ? 'text-cyan-500 dark:text-cyan-400 scale-105'
+                    : 'text-[#2563EB] dark:text-blue-400'
+                }`}
+              >
+                <div
+                  className={`transition-all ${
+                    isCurrent && isTraversalTask
+                      ? 'w-5 sm:w-9 h-[3px] bg-cyan-500 dark:bg-cyan-400 animate-pulse'
+                      : 'w-4 sm:w-8 h-[2px] bg-[#2563EB] dark:bg-blue-400'
+                  }`}
+                />
+                <ArrowRight
+                  className={`-ml-1.5 shrink-0 transition-transform ${
+                    isCurrent && isTraversalTask
+                      ? 'w-5 h-5 text-cyan-500 dark:text-cyan-400 animate-pulse stroke-[3]'
+                      : 'w-4 h-4 text-[#2563EB] dark:text-blue-400 stroke-[2.5]'
+                  }`}
+                />
               </div>
             ) : (
               <div
@@ -545,17 +663,55 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
                   setDraggingFromAddr(null);
                   setIsDragOverNull(false);
                 }}
-                onClick={() => onConnectNextDirect && onConnectNextDirect(node.address, null)}
-                className="flex items-center cursor-pointer group/null"
+                onClick={() => {
+                  if (isTraversalTask && onTraversalNullClick) {
+                    onTraversalNullClick();
+                  } else {
+                    onConnectNextDirect && onConnectNextDirect(node.address, null);
+                  }
+                }}
+                className={`flex items-center cursor-pointer group/null relative transition-all ${
+                  isCurrent && isTraversalTask ? 'scale-105' : ''
+                }`}
                 title="NEXT points to NULL (Terminator) - Click to confirm NULL"
               >
-                <div className="w-3 sm:w-6 h-[2px] bg-rose-400 dark:bg-rose-500" />
-                <ArrowRight className="w-3.5 h-3.5 -ml-1 text-rose-400 dark:text-rose-500 shrink-0" />
+                {/* Floating banner for NULL when expecting NULL in traversal */}
+                {isTraversalTask && isCurrent && (
+                  <motion.div
+                    initial={{ y: -8, opacity: 0 }}
+                    animate={{ y: [-3, 1, -3], opacity: 1 }}
+                    transition={{ repeat: Infinity, duration: 1.2 }}
+                    className="absolute -top-12 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none whitespace-nowrap"
+                  >
+                    <div className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-mono font-bold shadow-lg shadow-rose-500/40 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      <span>Select NULL</span>
+                    </div>
+                    <ArrowDown className="w-3 h-3 text-rose-500 stroke-[3]" />
+                  </motion.div>
+                )}
+
                 <div
-                  className={`ml-1 px-2 py-0.5 rounded-md border text-[10px] font-mono font-bold transition-all shadow-2xs ${
-                    isDragOverNull
+                  className={`h-[2px] transition-all ${
+                    isCurrent && isTraversalTask
+                      ? 'w-4 sm:w-8 bg-rose-500 animate-pulse'
+                      : 'w-3 sm:w-6 bg-rose-400 dark:bg-rose-500'
+                  }`}
+                />
+                <ArrowRight
+                  className={`-ml-1 shrink-0 ${
+                    isCurrent && isTraversalTask
+                      ? 'w-4.5 h-4.5 text-rose-500 animate-pulse stroke-[3]'
+                      : 'w-3.5 h-3.5 text-rose-400 dark:text-rose-500'
+                  }`}
+                />
+                <div
+                  className={`ml-1 px-2.5 py-1 rounded-xl border text-xs font-mono font-bold transition-all shadow-xs ${
+                    isCurrent && isTraversalTask
+                      ? 'bg-rose-500 text-white ring-4 ring-rose-400/50 scale-110 animate-pulse'
+                      : isDragOverNull
                       ? 'bg-rose-500 text-white ring-4 ring-rose-400/50 scale-110'
-                      : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-500/40 text-rose-600 dark:text-rose-400 group-hover/null:bg-rose-100'
+                      : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-500/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40'
                   }`}
                 >
                   NULL
@@ -830,44 +986,57 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
             </p>
           </div>
         ) : (
-          <div
-            className="w-full flex flex-col items-center justify-center transition-transform duration-200 gap-4"
-            style={{
-              transform: scaleFactor < 1 ? `scale(${scaleFactor})` : undefined,
-              transformOrigin: 'center center',
-            }}
-          >
-            {/* Flex row of reachable nodes or nodes awaiting HEAD */}
-            <div className="flex items-center justify-center flex-nowrap gap-1 sm:gap-2 py-4 px-1 overflow-x-auto max-w-full">
-              {/* Drop Zone: Before HEAD */}
-              {onInsertBetween && orderedNodes.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onInsertBetween(null, orderedNodes[0]?.address || null)}
-                  className="opacity-40 hover:opacity-100 hover:scale-105 px-1.5 py-3 rounded-xl border border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-[9px] font-mono font-bold text-[#2563EB] dark:text-blue-300 transition-all flex flex-col items-center justify-center shrink-0 cursor-pointer"
-                  title="Insert before HEAD"
-                >
-                  <span>+</span>
-                  <span className="text-[7px]">PREPEND</span>
-                </button>
-              )}
+          <div className="w-full flex flex-col items-center justify-center transition-transform duration-200 gap-4">
+            {/* Full horizontal visibility row: auto-scrolls without clipping first or last nodes */}
+            <div
+              ref={scrollContainerRef}
+              className="w-full overflow-x-auto overflow-y-visible scroll-smooth pt-14 pb-12 px-6 sm:px-10"
+            >
+              <div className="min-w-max mx-auto flex items-center justify-start flex-nowrap gap-2 sm:gap-3">
+                {/* Explicit HEAD Pointer Leader: HEAD → [First Node] */}
+                {primaryStageNodes.length > 0 && pointers.headAddress !== null && (
+                  <div className="flex items-center shrink-0 mr-1 select-none">
+                    <div className="px-3 py-1.5 rounded-xl bg-[#2563EB] text-white text-xs font-mono font-bold shadow-md flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                      <span>HEAD</span>
+                    </div>
+                    <div className="flex items-center text-[#2563EB] dark:text-blue-400">
+                      <div className="w-3 sm:w-6 h-[2.5px] bg-[#2563EB] dark:bg-blue-400" />
+                      <ArrowRight className="w-4 h-4 -ml-1 text-[#2563EB] dark:text-blue-400 stroke-[2.5]" />
+                    </div>
+                  </div>
+                )}
 
-              <AnimatePresence mode="popLayout">
-                {primaryStageNodes.map((node) => renderNodeCard(node, true))}
-              </AnimatePresence>
+                {/* Drop Zone: Before HEAD */}
+                {onInsertBetween && orderedNodes.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onInsertBetween(null, orderedNodes[0]?.address || null)}
+                    className="opacity-40 hover:opacity-100 hover:scale-105 px-1.5 py-3 rounded-xl border border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-[9px] font-mono font-bold text-[#2563EB] dark:text-blue-300 transition-all flex flex-col items-center justify-center shrink-0 cursor-pointer"
+                    title="Insert before HEAD"
+                  >
+                    <span>+</span>
+                    <span className="text-[7px]">PREPEND</span>
+                  </button>
+                )}
 
-              {/* Drop Zone: After TAIL */}
-              {onInsertBetween && orderedNodes.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onInsertBetween(orderedNodes[orderedNodes.length - 1]?.address || null, null)}
-                  className="opacity-40 hover:opacity-100 hover:scale-105 px-1.5 py-3 rounded-xl border border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-[9px] font-mono font-bold text-[#2563EB] dark:text-blue-300 transition-all flex flex-col items-center justify-center shrink-0 cursor-pointer ml-1"
-                  title="Insert after TAIL"
-                >
-                  <span>+</span>
-                  <span className="text-[7px]">APPEND</span>
-                </button>
-              )}
+                <AnimatePresence mode="popLayout">
+                  {primaryStageNodes.map((node) => renderNodeCard(node, true))}
+                </AnimatePresence>
+
+                {/* Drop Zone: After TAIL */}
+                {onInsertBetween && orderedNodes.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onInsertBetween(orderedNodes[orderedNodes.length - 1]?.address || null, null)}
+                    className="opacity-40 hover:opacity-100 hover:scale-105 px-1.5 py-3 rounded-xl border border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-[9px] font-mono font-bold text-[#2563EB] dark:text-blue-300 transition-all flex flex-col items-center justify-center shrink-0 cursor-pointer ml-1"
+                    title="Insert after TAIL"
+                  >
+                    <span>+</span>
+                    <span className="text-[7px]">APPEND</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Unlinked / Isolated Nodes in RAM waiting to be linked */}
@@ -884,10 +1053,14 @@ export const SLLWorkspace: React.FC<SLLWorkspaceProps> = ({
                     </div>
                     <div>
                       <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider block">
-                        Unlinked Nodes in Heap RAM (Not connected to HEAD)
+                        {detachedAddress
+                          ? 'Detached Node (Separated from Active List)'
+                          : 'Unlinked Nodes in Heap RAM (Not connected to HEAD)'}
                       </span>
                       <span className="text-xs text-slate-600 dark:text-slate-300">
-                        {secondaryUnlinkedNodes.length} node{secondaryUnlinkedNodes.length !== 1 ? 's' : ''} waiting to be linked with NEXT or set as HEAD/TAIL.
+                        {detachedAddress
+                          ? 'This node is decoupled from the chain and shown separately before deallocation (free).'
+                          : `${secondaryUnlinkedNodes.length} node${secondaryUnlinkedNodes.length !== 1 ? 's' : ''} waiting to be linked with NEXT or set as HEAD/TAIL.`}
                       </span>
                     </div>
                   </div>

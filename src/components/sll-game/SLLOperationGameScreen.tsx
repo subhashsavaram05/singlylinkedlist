@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -129,6 +129,41 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   const [selectedAddress, setSelectedAddress] = useState<number | null>(null);
   const [hintLevel, setHintLevel] = useState<number>(0);
 
+  // Dynamic position for L4_T2 ("Delete at Any Position")
+  const [deletePosition, setDeletePosition] = useState<number>(2);
+
+  const handleSelectDeletePosition = (pos: number) => {
+    // 1. Reset all previous states completely (Rule 5)
+    setSelectedAddress(null);
+    setPendingConnectFrom(null);
+    setIsSettingHeadMode(false);
+    setIsSettingTailMode(false);
+    setIsDeletingNodeMode(false);
+    setIsConnectingNextMode(false);
+    setCurrentStep(1);
+    setCompletedSteps([]);
+    setTaskStatus('in_progress');
+    setIsCompleted(false);
+    setTeacherLastActionResult(null);
+    setHistory([]);
+    setRedoStack([]);
+
+    // 2. Reset nodes and pointers to initial fresh list
+    const initialNodes = JSON.parse(JSON.stringify(activeTask.initialNodes));
+    const initialPointers = JSON.parse(JSON.stringify(activeTask.initialPointers));
+    setNodes(initialNodes);
+    setPointers(initialPointers);
+
+    // 3. Set new position
+    setDeletePosition(pos);
+    soundManager.play('click');
+    setFeedback({
+      type: 'info',
+      title: `Position ${pos} Selected`,
+      message: `Target updated dynamically to Position ${pos}. Click the target node card to begin deletion.`,
+    });
+  };
+
   // Evaluation & HUD
   const [feedback, setFeedback] = useState<SLLFeedback | null>(null);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
@@ -167,6 +202,9 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     setTaskStatus('in_progress');
     setHistory([]);
     setRedoStack([]);
+    if (taskId === 'L4_T2') {
+      setDeletePosition(2);
+    }
   };
 
   useEffect(() => {
@@ -337,6 +375,133 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     advanceStepIfActionMatches('delete_node', address);
   };
 
+  // Traversal Step Interaction (Level 3 & Level 5 Traversal)
+  const isTraversalTask =
+    activeTask.targetCondition.customValidator === 'L3_TRAVERSAL_COMPLETE' ||
+    activeTask.id === 'L3_T1' ||
+    activeTask.targetCondition.customValidator === 'L5_FINAL_TRAVERSAL_5';
+
+  const traversalNextExpectedAddr: number | null = (() => {
+    if (!isTraversalTask) return null;
+    if (pointers.currentAddress === null) {
+      return pointers.headAddress;
+    }
+    const curr = nodes.find((n) => n.address === pointers.currentAddress);
+    return curr ? curr.nextAddress : null;
+  })();
+
+  const handleTraversalNodeClick = (address: number) => {
+    if (taskStatus === 'completed' || isCompleted) return;
+
+    if (pointers.currentAddress === null) {
+      // Traversal must start at HEAD
+      if (address === pointers.headAddress) {
+        pushSnapshot();
+        const headNode = nodes.find((n) => n.address === address);
+        setPointers((prev) => ({ ...prev, currentAddress: address }));
+        if (headNode) {
+          setTraversalOutput([headNode.data]);
+        }
+        setSelectedAddress(address);
+        soundManager.play('step');
+        setCompletedSteps([1]);
+        setCurrentStep(2);
+        const nextNode = headNode?.nextAddress
+          ? nodes.find((n) => n.address === headNode.nextAddress)
+          : null;
+        setFeedback({
+          type: 'info',
+          title: 'CURRENT Initialized to HEAD',
+          message: `✓ CURRENT = Node ${headNode?.data ?? address}. Streamed DATA: ${headNode?.data ?? address}. Follow NEXT pointer to Node ${nextNode?.data ?? 'NULL'}.`,
+        });
+      } else {
+        soundManager.play('error');
+        setFeedback({
+          type: 'error',
+          title: 'Incorrect Selection',
+          message: 'Incorrect. Follow the NEXT pointer. Traversal must start at HEAD.',
+        });
+      }
+      return;
+    }
+
+    const currNode = nodes.find((n) => n.address === pointers.currentAddress);
+    if (!currNode) return;
+
+    if (currNode.nextAddress !== null) {
+      if (address === currNode.nextAddress) {
+        pushSnapshot();
+        const nextNode = nodes.find((n) => n.address === address);
+        setPointers((prev) => ({ ...prev, currentAddress: address }));
+        if (nextNode) {
+          setTraversalOutput((prev) => [...prev, nextNode.data]);
+        }
+        setSelectedAddress(address);
+        soundManager.play('step');
+        const nextStepNum = currentStep + 1;
+        setCompletedSteps((prev) => [...new Set([...prev, currentStep])]);
+        setCurrentStep(nextStepNum);
+
+        const followingNode = nextNode?.nextAddress
+          ? nodes.find((n) => n.address === nextNode.nextAddress)
+          : null;
+        setFeedback({
+          type: 'info',
+          title: 'CURRENT Advanced',
+          message: `✓ CURRENT moved to Node ${nextNode?.data ?? address}. Streamed DATA: ${nextNode?.data ?? address}. ${
+            followingNode
+              ? `Follow NEXT pointer to Node ${followingNode.data}.`
+              : 'Now follow NEXT pointer to NULL to complete traversal.'
+          }`,
+        });
+      } else {
+        soundManager.play('error');
+        setFeedback({
+          type: 'error',
+          title: 'Incorrect Selection',
+          message: 'Incorrect. Follow the NEXT pointer.',
+        });
+      }
+    } else {
+      soundManager.play('error');
+      setFeedback({
+        type: 'error',
+        title: 'End of List',
+        message: 'Current node has NEXT = NULL. Select NULL to complete traversal.',
+      });
+    }
+  };
+
+  const handleTraversalNullClick = () => {
+    if (taskStatus === 'completed' || isCompleted) return;
+    if (!isTraversalTask) return;
+
+    const currNode = nodes.find((n) => n.address === pointers.currentAddress);
+    if (currNode && currNode.nextAddress === null) {
+      pushSnapshot();
+      setPointers((prev) => ({ ...prev, currentAddress: null }));
+      setCompletedSteps([1, 2, 3, 4, 5]);
+      setCurrentStep(5);
+      soundManager.play('celebrate');
+      setIsCompleted(true);
+      setTaskStatus('completed');
+      progressManager.addScore(activeTask.xpReward);
+      setFeedback({
+        type: 'success',
+        title: 'Traversal Completed! 🎉',
+        message: 'CURRENT reached NULL. All nodes visited in sequence: 10 → 20 → 30 → 40 → NULL.',
+        explanation: activeTask.conceptExplanation,
+      });
+    } else {
+      soundManager.play('error');
+      setFeedback({
+        type: 'error',
+        title: 'Incorrect Selection',
+        message: 'Incorrect. Follow the NEXT pointer. CURRENT has not reached the end of the list yet.',
+      });
+    }
+  };
+
   const handleNodeClickDirect = (address: number) => {
     if (isDeletingNodeMode) {
       handleDeleteNode(address);
@@ -348,8 +513,31 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
       handleSetHeadDirect(address);
     } else if (isSettingTailMode) {
       handleSetTailDirect(address);
+    } else if (currentTeacherStep?.actionType === 'delete_node' && currentTeacherStep.targetAddress === address) {
+      handleDeleteNode(address);
+    } else if (isTraversalTask) {
+      handleTraversalNodeClick(address);
+    } else if (activeTask.id === 'L4_T2' && currentStep === 1) {
+      if (currentTeacherStep?.targetAddress === address) {
+        soundManager.play('step');
+        setFeedback({
+          type: 'success',
+          title: 'Correct! This is the target node.',
+          message: `Target node (Address ${address}) identified at Position ${deletePosition}. Proceed to Step 2.`,
+        });
+        setSelectedAddress(address);
+        advanceStepIfActionMatches('select_node', address);
+      } else {
+        soundManager.play('error');
+        setFeedback({
+          type: 'error',
+          title: 'Incorrect Target Selection',
+          message: `Incorrect. Select the node at Position ${deletePosition}.`,
+        });
+      }
     } else {
       setSelectedAddress(address);
+      advanceStepIfActionMatches('select_node', address);
     }
   };
 
@@ -510,75 +698,14 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     setActiveModal('HINT');
   };
 
-  // Traversal Step Interaction (Level 3)
+  // Traversal Step Interaction (Adapter for direct input or buttons)
   const handleTraversalAnswer = (answer: string) => {
-    pushSnapshot();
-    if (pointers.currentAddress === null) {
-      // Expecting HEAD
-      if (answer === String(pointers.headAddress)) {
-        const headNode = nodes.find((n) => n.address === pointers.headAddress);
-        if (headNode) {
-          setPointers((prev) => ({ ...prev, currentAddress: headNode.address }));
-          setTraversalOutput([headNode.data]);
-          soundManager.play('step');
-          setFeedback({
-            type: 'info',
-            title: 'CURRENT Initialized to HEAD',
-            message: `CURRENT = ${headNode.address}. Node data ${headNode.data} printed to stream.`,
-          });
-        }
-      } else {
-        soundManager.play('error');
-        setFeedback({
-          type: 'error',
-          title: 'Incorrect Address',
-          message: `Traversal must begin at HEAD (${pointers.headAddress}).`,
-        });
-      }
+    if (answer.toUpperCase() === 'NULL') {
+      handleTraversalNullClick();
     } else {
-      const curr = nodes.find((n) => n.address === pointers.currentAddress);
-      if (!curr) return;
-
-      if (curr.nextAddress === null) {
-        if (answer.toUpperCase() === 'NULL') {
-          setPointers((prev) => ({ ...prev, currentAddress: null }));
-          soundManager.play('success');
-          setIsCompleted(true);
-          setFeedback({
-            type: 'success',
-            title: 'Traversal Reached NULL! 🎉',
-            message: 'All elements printed in order to the output stream.',
-          });
-          progressManager.addScore(activeTask.xpReward);
-        } else {
-          soundManager.play('error');
-          setFeedback({
-            type: 'error',
-            title: 'End of List',
-            message: `Current node has NEXT = NULL. Enter "NULL" to finish.`,
-          });
-        }
-      } else {
-        if (answer === String(curr.nextAddress)) {
-          const nextNode = nodes.find((n) => n.address === curr.nextAddress);
-          if (nextNode) {
-            setPointers((prev) => ({ ...prev, currentAddress: nextNode.address }));
-            setTraversalOutput((prev) => [...prev, nextNode.data]);
-            soundManager.play('step');
-            setFeedback({
-              type: 'info',
-              title: 'CURRENT Advanced',
-              message: `CURRENT moved to ${nextNode.address}. Outputted DATA: ${nextNode.data}.`,
-            });
-          }
-        } else {
-          soundManager.play('error');
-          setFeedback({
-            type: 'error',
-            title: 'Wrong NEXT Address',
-            message: `Node ${curr.address} stores NEXT = ${curr.nextAddress}. Look at the NEXT field.`,
-          });
-        }
+      const addr = Number(answer);
+      if (!isNaN(addr)) {
+        handleTraversalNodeClick(addr);
       }
     }
   };
@@ -587,8 +714,39 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   const currentSearchNode = nodes.find((n) => n.address === pointers.currentAddress);
 
   // Active Teacher Step for GUIDE & SOLVE mode (real sequential step state machine)
-  const currentTeacherStep = getTaskStep(activeTask, currentStep, nodes, pointers);
-  const totalTaskSteps = getTaskTotalSteps(activeTask);
+  const currentTeacherStep = getTaskStep(activeTask, currentStep, nodes, pointers, deletePosition);
+  const totalTaskSteps = getTaskTotalSteps(activeTask, deletePosition);
+
+  // Dynamic Node Role Labels for L4_T2 ("Delete at Any Position")
+  const nodeRoleLabels = useMemo(() => {
+    if (activeTask.id !== 'L4_T2') return undefined;
+    const labels: Record<number, string> = {};
+    if (currentTeacherStep?.highlightAddresses && currentTeacherStep.highlightAddresses.length === 3) {
+      const [prevAddr, tgtAddr, nextAddr] = currentTeacherStep.highlightAddresses;
+      if (prevAddr) labels[prevAddr] = 'PREVIOUS';
+      if (tgtAddr) labels[tgtAddr] = 'TARGET';
+      if (nextAddr) labels[nextAddr] = 'NEXT';
+    } else if (currentTeacherStep?.targetAddress) {
+      labels[currentTeacherStep.targetAddress] = 'TARGET';
+    }
+    return labels;
+  }, [activeTask.id, currentTeacherStep]);
+
+  // Active Highlight Addresses: during traversal, enforce strict 2-node maximum highlighting:
+  // [Current visited node, Next target node] or [HEAD node]
+  const activeHighlightAddresses = (() => {
+    if (isTraversalTask) {
+      if (pointers.currentAddress === null) {
+        return pointers.headAddress !== null ? [pointers.headAddress] : [];
+      }
+      const curr = nodes.find((n) => n.address === pointers.currentAddress);
+      if (curr?.nextAddress !== null && curr?.nextAddress !== undefined) {
+        return [pointers.currentAddress, curr.nextAddress];
+      }
+      return [pointers.currentAddress];
+    }
+    return currentTeacherStep?.highlightAddresses;
+  })();
 
   // Helper to advance the step machine on successful user action in PLAY mode
   const advanceStepIfActionMatches = (
@@ -597,7 +755,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     targetVal?: number | null
   ) => {
     if (taskStatus === 'completed' || isCompleted) return;
-    const step = currentTeacherStep || getTaskStep(activeTask, currentStep, nodes, pointers);
+    const step = currentTeacherStep || getTaskStep(activeTask, currentStep, nodes, pointers, deletePosition);
     if (!step) return;
 
     let matched = false;
@@ -609,6 +767,8 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
       } else if (actionType === 'connect_next') {
         matched = step.targetAddress === undefined || step.targetAddress === targetAddr;
       } else if (actionType === 'delete_node') {
+        matched = step.targetAddress === undefined || step.targetAddress === targetAddr;
+      } else if (actionType === 'select_node' || actionType === 'highlight_target') {
         matched = step.targetAddress === undefined || step.targetAddress === targetAddr;
       } else {
         matched = true;
@@ -643,7 +803,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   const handleExecuteTeacherStep = () => {
     if (taskStatus === 'completed' || isCompleted) return;
 
-    const stepToExecute = currentTeacherStep || getTaskStep(activeTask, currentStep, nodes, pointers);
+    const stepToExecute = currentTeacherStep || getTaskStep(activeTask, currentStep, nodes, pointers, deletePosition);
     if (!stepToExecute) return;
 
     pushSnapshot();
@@ -679,7 +839,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     } else {
       const nextStepNum = stepJustFinished + 1;
       setCurrentStep(nextStepNum);
-      const nextStepDef = getTaskStep(activeTask, nextStepNum, result.nodes, result.pointers);
+      const nextStepDef = getTaskStep(activeTask, nextStepNum, result.nodes, result.pointers, deletePosition);
       setFeedback({
         type: 'info',
         title: `✓ Step ${stepJustFinished} Completed!`,
@@ -731,7 +891,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   const handleCheckAnswer = () => {
     setAttempts((prev) => prev + 1);
     const searchDone = isCompleted || searchResult === 'found';
-    const result = validateTaskAnswer(activeTask, nodes, pointers, traversalOutput, searchDone);
+    const result = validateTaskAnswer(activeTask, nodes, pointers, traversalOutput, searchDone, deletePosition);
 
     setFeedback(result.feedback);
 
@@ -1006,6 +1166,39 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
             />
           )}
 
+          {/* DYNAMIC POSITION SELECTOR FOR L4_T2 ("Delete at Any Position") */}
+          {activeTask.id === 'L4_T2' && (
+            <div className="bg-white dark:bg-[#0B1228] border border-slate-200 dark:border-blue-900/30 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider font-mono">
+                  Delete Position:
+                </span>
+                <span className="text-xs font-semibold text-[#2563EB] dark:text-blue-400 font-mono">
+                  Position {deletePosition} {deletePosition === 1 ? '(HEAD Node)' : deletePosition === 5 ? '(LAST Node)' : '(Middle Node)'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[1, 2, 3, 4, 5].map((pos) => {
+                  const isSelected = deletePosition === pos;
+                  return (
+                    <button
+                      key={pos}
+                      type="button"
+                      onClick={() => handleSelectDeletePosition(pos)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-400'
+                          : 'bg-slate-100 hover:bg-slate-200 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-blue-900/40'
+                      }`}
+                    >
+                      Pos {pos}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <SLLWorkspace
             nodes={nodes}
             pointers={pointers}
@@ -1022,6 +1215,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
             isTraversing={isTraversing}
             isSearching={isSearching}
             levelId={currentLevelId}
+            nodeRoleLabels={nodeRoleLabels}
             // Direct interactive workspace props
             pendingConnectFrom={pendingConnectFrom}
             isSettingHeadMode={isSettingHeadMode}
@@ -1035,6 +1229,11 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
             onNodeClickDirect={handleNodeClickDirect}
             onInsertBetween={handleInsertBetween}
             guideTargetAddress={currentTeacherStep?.targetAddress ?? activeTask.targetCondition.expectedHead ?? undefined}
+            highlightAddresses={activeHighlightAddresses}
+            detachedAddress={currentTeacherStep?.detachedAddress}
+            isTraversalTask={isTraversalTask}
+            traversalNextExpectedAddr={traversalNextExpectedAddr}
+            onTraversalNullClick={handleTraversalNullClick}
             // Integrated Workspace Pointer Toolbar props
             onCreateNode={handleQuickCreateNode}
             onOpenCreateNodeModal={() => setActiveModal('CREATE_NODE')}
@@ -1110,6 +1309,9 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
               onNextTask={handleNextTaskClick}
               hasNextTask={Boolean(nextTaskId)}
               // Traversal props
+              traversalOutput={traversalOutput}
+              traversalNextExpectedAddr={traversalNextExpectedAddr}
+              onTraversalNullClick={handleTraversalNullClick}
               onTraversalAnswer={activeTask.targetCondition.customValidator === 'L3_TRAVERSAL_COMPLETE' ? handleTraversalAnswer : undefined}
               // Search props
               searchStepPrompt={
@@ -1119,6 +1321,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
                   : null
               }
               onSearchAnswer={handleSearchAnswer}
+              deletePosition={deletePosition}
             />
           </div>
         </div>

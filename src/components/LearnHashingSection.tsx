@@ -18,10 +18,11 @@ import {
   Code2,
 } from 'lucide-react';
 import { TechniqueType } from '../types/game';
-import { progressManager, normalizeTheoryChapterId } from '../utils/progressManager';
+import { progressManager, normalizeTheoryChapterId, TOTAL_CONCEPTS } from '../utils/progressManager';
 import { soundManager } from '../utils/audio';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { TheoryVisualEnhancer } from './TheoryVisualEnhancer';
+import { CodeImplementationSection } from './CodeImplementationSection';
 
 export interface LearnHashingSectionProps {
   initialTopic?: string;
@@ -31,6 +32,7 @@ export interface LearnHashingSectionProps {
 
 export interface CodeBlockProps {
   cCode?: string;
+  cppCode?: string;
   javaCode?: string;
   pythonCode?: string;
 }
@@ -50,6 +52,7 @@ export interface TheoryChapter {
   steps?: string[];
   resultAscii?: string;
   cCode?: string;
+  cppCode?: string;
   javaCode?: string;
   pythonCode?: string;
   timeComplexity?: string;
@@ -101,6 +104,131 @@ export const THEORY_CHAPTERS: TheoryChapter[] = [
  ↓
 [10 | •] → [20 | •] → [30 | NULL]`,
     analogy: 'Think of it like a chain. Each node knows where the next node is.',
+    cppCode: `#include <iostream>
+using namespace std;
+
+// Definition of a Singly Linked List Node
+struct Node {
+    int data;
+    Node* next;
+
+    // Constructor to initialize a new node
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+int main() {
+    // 1. Create individual nodes dynamically on the Heap
+    Node* head = new Node(10);
+    Node* second = new Node(20);
+    Node* third = new Node(30);
+
+    // 2. Link the nodes sequentially: 10 -> 20 -> 30 -> nullptr
+    head->next = second;
+    second->next = third;
+
+    // 3. Traverse and display the linked list
+    cout << "Linked List: ";
+    Node* temp = head;
+    while (temp != nullptr) {
+        cout << temp->data << " -> ";
+        temp = temp->next;
+    }
+    cout << "NULL" << endl;
+
+    // Free allocated memory
+    delete third;
+    delete second;
+    delete head;
+
+    return 0;
+}`,
+    cCode: `#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int data;
+    struct Node* next;
+};
+
+int main() {
+    // 1. Allocate nodes on heap
+    struct Node* head = (struct Node*)malloc(sizeof(struct Node));
+    struct Node* second = (struct Node*)malloc(sizeof(struct Node));
+    struct Node* third = (struct Node*)malloc(sizeof(struct Node));
+
+    // 2. Assign values and link
+    head->data = 10;
+    head->next = second;
+
+    second->data = 20;
+    second->next = third;
+
+    third->data = 30;
+    third->next = NULL;
+
+    // 3. Print
+    struct Node* temp = head;
+    while (temp != NULL) {
+        printf("%d -> ", temp->data);
+        temp = temp->next;
+    }
+    printf("NULL\\n");
+
+    free(third);
+    free(second);
+    free(head);
+    return 0;
+}`,
+    javaCode: `class Node {
+    int data;
+    Node next;
+
+    Node(int value) {
+        this.data = value;
+        this.next = null;
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Node head = new Node(10);
+        Node second = new Node(20);
+        Node third = new Node(30);
+
+        head.next = second;
+        second.next = third;
+
+        Node temp = head;
+        while (temp != null) {
+            System.out.print(temp.data + " -> ");
+            temp = temp.next;
+        }
+        System.out.println("NULL");
+    }
+}`,
+    pythonCode: `class Node:
+    def __init__(self, value):
+        self.data = value
+        self.next = None
+
+# Create nodes
+head = Node(10)
+second = Node(20)
+third = Node(30)
+
+# Link nodes
+head.next = second
+second.next = third
+
+# Print list
+temp = head
+while temp is not None:
+    print(temp.data, end=" -> ")
+    temp = temp.next
+print("NULL")`,
   },
 
   // 2. OPERATIONS OF SINGLY LINKED LIST
@@ -139,6 +267,141 @@ export const THEORY_CHAPTERS: TheoryChapter[] = [
         ],
       },
     ],
+    cppCode: `#include <iostream>
+using namespace std;
+
+// Node structure
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Singly Linked List class demonstrating major operations
+class SinglyLinkedList {
+public:
+    Node* head;
+
+    SinglyLinkedList() {
+        head = nullptr;
+    }
+
+    // 1. Insert at Beginning - O(1)
+    void insertAtBeginning(int value) {
+        Node* newNode = new Node(value);
+        newNode->next = head;
+        head = newNode;
+    }
+
+    // 2. Insert at End - O(n)
+    void insertAtEnd(int value) {
+        Node* newNode = new Node(value);
+        if (head == nullptr) {
+            head = newNode;
+            return;
+        }
+        Node* temp = head;
+        while (temp->next != nullptr) {
+            temp = temp->next;
+        }
+        temp->next = newNode;
+    }
+
+    // 3. Delete at Beginning - O(1)
+    void deleteAtBeginning() {
+        if (head == nullptr) {
+            cout << "List is empty." << endl;
+            return;
+        }
+        Node* temp = head;
+        head = head->next;
+        delete temp;
+    }
+
+    // 4. Delete at End - O(n)
+    void deleteAtEnd() {
+        if (head == nullptr) {
+            cout << "List is empty." << endl;
+            return;
+        }
+        if (head->next == nullptr) {
+            delete head;
+            head = nullptr;
+            return;
+        }
+        Node* temp = head;
+        while (temp->next->next != nullptr) {
+            temp = temp->next;
+        }
+        delete temp->next;
+        temp->next = nullptr;
+    }
+
+    // 5. Search for a value - O(n)
+    bool search(int key) {
+        Node* temp = head;
+        while (temp != nullptr) {
+            if (temp->data == key) return true;
+            temp = temp->next;
+        }
+        return false;
+    }
+
+    // 6. Display list - O(n)
+    void display() {
+        Node* temp = head;
+        while (temp != nullptr) {
+            cout << temp->data << " -> ";
+            temp = temp->next;
+        }
+        cout << "NULL" << endl;
+    }
+
+    // Destructor to clean up all nodes
+    ~SinglyLinkedList() {
+        while (head != nullptr) {
+            deleteAtBeginning();
+        }
+    }
+};
+
+int main() {
+    SinglyLinkedList list;
+
+    // Demonstrating Insertion
+    list.insertAtEnd(10);
+    list.insertAtEnd(20);
+    list.insertAtEnd(30);
+    cout << "Initial list: ";
+    list.display(); // 10 -> 20 -> 30 -> NULL
+
+    cout << "Insert 5 at beginning: ";
+    list.insertAtBeginning(5);
+    list.display(); // 5 -> 10 -> 20 -> 30 -> NULL
+
+    cout << "Insert 40 at end: ";
+    list.insertAtEnd(40);
+    list.display(); // 5 -> 10 -> 20 -> 30 -> 40 -> NULL
+
+    // Demonstrating Deletion
+    cout << "Delete at beginning: ";
+    list.deleteAtBeginning();
+    list.display(); // 10 -> 20 -> 30 -> 40 -> NULL
+
+    cout << "Delete at end: ";
+    list.deleteAtEnd();
+    list.display(); // 10 -> 20 -> 30 -> NULL
+
+    // Demonstrating Search
+    cout << "Search 20: " << (list.search(20) ? "Found" : "Not Found") << endl;
+    cout << "Search 99: " << (list.search(99) ? "Found" : "Not Found") << endl;
+
+    return 0;
+}`,
   },
 
   // 3. INSERTION AT THE BEGINNING
@@ -160,6 +423,59 @@ export const THEORY_CHAPTERS: TheoryChapter[] = [
     resultAscii: `5 → 10 → 20 → 30 → NULL
 ↑
 HEAD`,
+    cppCode: `#include <iostream>
+using namespace std;
+
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Insert at the beginning: O(1) time complexity
+void insertAtBeginning(Node*& head, int value) {
+    // 1. Create a new node containing the value
+    Node* newNode = new Node(value);
+
+    // 2. Make the new node point to current HEAD
+    newNode->next = head;
+
+    // 3. Make HEAD point to the new node
+    head = newNode;
+}
+
+void display(Node* head) {
+    Node* temp = head;
+    while (temp != nullptr) {
+        cout << temp->data << " -> ";
+        temp = temp->next;
+    }
+    cout << "NULL" << endl;
+}
+
+int main() {
+    // Initial List: 10 -> 20 -> 30 -> NULL
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(30);
+
+    cout << "Original List: ";
+    display(head);
+
+    // Insert 5 at beginning
+    cout << "Inserting 5 at beginning..." << endl;
+    insertAtBeginning(head, 5);
+
+    // Expected: 5 -> 10 -> 20 -> 30 -> NULL
+    cout << "Resulting List: ";
+    display(head);
+
+    return 0;
+}`,
     cCode: `struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
 
 newNode->data = 5;
@@ -195,6 +511,68 @@ head = new_node`,
       '5. Make the last node point to the new node.',
     ],
     resultAscii: `10 → 20 → 30 → 40 → NULL`,
+    cppCode: `#include <iostream>
+using namespace std;
+
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Insert at the end: O(n) without tail pointer
+void insertAtEnd(Node*& head, int value) {
+    // 1 & 2. Create new node with next = nullptr
+    Node* newNode = new Node(value);
+
+    // If list is empty, new node becomes the HEAD
+    if (head == nullptr) {
+        head = newNode;
+        return;
+    }
+
+    // 3 & 4. Traverse from HEAD to the last node
+    Node* temp = head;
+    while (temp->next != nullptr) {
+        temp = temp->next;
+    }
+
+    // 5. Link the last node to the new node
+    temp->next = newNode;
+}
+
+void display(Node* head) {
+    Node* temp = head;
+    while (temp != nullptr) {
+        cout << temp->data << " -> ";
+        temp = temp->next;
+    }
+    cout << "NULL" << endl;
+}
+
+int main() {
+    // Initial List: 10 -> 20 -> 30 -> NULL
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(30);
+
+    cout << "Original List: ";
+    display(head);
+
+    // Insert 40 at end
+    cout << "Inserting 40 at end..." << endl;
+    insertAtEnd(head, 40);
+
+    // Expected: 10 -> 20 -> 30 -> 40 -> NULL
+    cout << "Resulting List: ";
+    display(head);
+
+    return 0;
+}`,
     cCode: `struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
 
 newNode->data = 40;
@@ -258,6 +636,78 @@ else:
       '4. Make the new node point to the next node.',
       '5. Make the previous node point to the new node.',
     ],
+    cppCode: `#include <iostream>
+using namespace std;
+
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Insert at given position (1-based index): O(n)
+void insertAtPosition(Node*& head, int value, int position) {
+    if (position <= 1 || head == nullptr) {
+        Node* newNode = new Node(value);
+        newNode->next = head;
+        head = newNode;
+        return;
+    }
+
+    // 1. Create a new node
+    Node* newNode = new Node(value);
+
+    // 2. Move to node just before the required position (pos - 1)
+    Node* temp = head;
+    for (int i = 1; i < position - 1 && temp != nullptr; i++) {
+        temp = temp->next;
+    }
+
+    if (temp == nullptr) {
+        cout << "Position out of range." << endl;
+        delete newNode;
+        return;
+    }
+
+    // 3 & 4. Make new node point to the next node
+    newNode->next = temp->next;
+
+    // 5. Make previous node point to new node
+    temp->next = newNode;
+}
+
+void display(Node* head) {
+    Node* temp = head;
+    while (temp != nullptr) {
+        cout << temp->data << " -> ";
+        temp = temp->next;
+    }
+    cout << "NULL" << endl;
+}
+
+int main() {
+    // Initial List: 10 -> 20 -> 40 -> NULL
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(40);
+
+    cout << "Original List: ";
+    display(head);
+
+    // Insert 30 between 20 and 40 (position 3)
+    cout << "Inserting 30 at position 3..." << endl;
+    insertAtPosition(head, 30, 3);
+
+    // Expected: 10 -> 20 -> 30 -> 40 -> NULL
+    cout << "Resulting List: ";
+    display(head);
+
+    return 0;
+}`,
     cCode: `struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
 
 newNode->data = 30;
@@ -310,6 +760,65 @@ temp.next = new_node`,
     resultAscii: `20 → 30 → NULL
 ↑
 HEAD`,
+    cppCode: `#include <iostream>
+using namespace std;
+
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Delete the first node: O(1) time complexity
+void deleteAtBeginning(Node*& head) {
+    // Check if list is empty
+    if (head == nullptr) {
+        cout << "List is empty." << endl;
+        return;
+    }
+
+    // 1. Save reference to the current HEAD
+    Node* temp = head;
+
+    // 2. Advance HEAD to the second node
+    head = head->next;
+
+    // 3. Free memory of the removed node
+    delete temp;
+}
+
+void display(Node* head) {
+    Node* temp = head;
+    while (temp != nullptr) {
+        cout << temp->data << " -> ";
+        temp = temp->next;
+    }
+    cout << "NULL" << endl;
+}
+
+int main() {
+    // Initial List: 10 -> 20 -> 30 -> NULL
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(30);
+
+    cout << "Original List: ";
+    display(head);
+
+    // Delete first node (10)
+    cout << "Deleting from beginning..." << endl;
+    deleteAtBeginning(head);
+
+    // Expected: 20 -> 30 -> NULL
+    cout << "Resulting List: ";
+    display(head);
+
+    return 0;
+}`,
     cCode: `if (head != NULL) {
     struct Node* temp = head;
     head = head->next;
@@ -341,6 +850,73 @@ HEAD`,
       '3. Stop at the node before the last node.',
       '4. Make its next point to NULL.',
     ],
+    cppCode: `#include <iostream>
+using namespace std;
+
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Delete the last node: O(n) time complexity
+void deleteAtEnd(Node*& head) {
+    // Case 1: Empty list
+    if (head == nullptr) {
+        cout << "List is empty." << endl;
+        return;
+    }
+
+    // Case 2: Only one node in list
+    if (head->next == nullptr) {
+        delete head;
+        head = nullptr;
+        return;
+    }
+
+    // Case 3: Traverse to node before the last node
+    Node* temp = head;
+    while (temp->next->next != nullptr) {
+        temp = temp->next;
+    }
+
+    // Free last node and set predecessor next to nullptr
+    delete temp->next;
+    temp->next = nullptr;
+}
+
+void display(Node* head) {
+    Node* temp = head;
+    while (temp != nullptr) {
+        cout << temp->data << " -> ";
+        temp = temp->next;
+    }
+    cout << "NULL" << endl;
+}
+
+int main() {
+    // Initial List: 10 -> 20 -> 30 -> NULL
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(30);
+
+    cout << "Original List: ";
+    display(head);
+
+    // Delete 30 (last node)
+    cout << "Deleting last node (30)..." << endl;
+    deleteAtEnd(head);
+
+    // Expected: 10 -> 20 -> NULL
+    cout << "Resulting List: ";
+    display(head);
+
+    return 0;
+}`,
     cCode: `if (head == NULL) {
     return;
 }
@@ -408,6 +984,82 @@ temp.next = None`,
       '20 → 30 → 40\n\nbecomes\n\n20 ─────────→ 40',
       'The previous node simply skips the node being deleted.',
     ],
+    cppCode: `#include <iostream>
+using namespace std;
+
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Delete node at given position (1-based index): O(n)
+void deleteAtPosition(Node*& head, int position) {
+    if (head == nullptr) {
+        cout << "List is empty." << endl;
+        return;
+    }
+
+    // Deleting position 1 (the head node)
+    if (position == 1) {
+        Node* temp = head;
+        head = head->next;
+        delete temp;
+        return;
+    }
+
+    // Move to node just before the node to be deleted (pos - 1)
+    Node* temp = head;
+    for (int i = 1; i < position - 1 && temp != nullptr; i++) {
+        temp = temp->next;
+    }
+
+    if (temp == nullptr || temp->next == nullptr) {
+        cout << "Position out of range." << endl;
+        return;
+    }
+
+    // Bypass the target node: 20 -> 40
+    Node* nodeToDelete = temp->next;
+    temp->next = nodeToDelete->next;
+
+    // Free memory
+    delete nodeToDelete;
+}
+
+void display(Node* head) {
+    Node* temp = head;
+    while (temp != nullptr) {
+        cout << temp->data << " -> ";
+        temp = temp->next;
+    }
+    cout << "NULL" << endl;
+}
+
+int main() {
+    // Initial List: 10 -> 20 -> 30 -> 40 -> NULL
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(30);
+    head->next->next->next = new Node(40);
+
+    cout << "Original List: ";
+    display(head);
+
+    // Delete node at position 3 (value 30)
+    cout << "Deleting node at position 3 (30)..." << endl;
+    deleteAtPosition(head, 3);
+
+    // Expected: 10 -> 20 -> 40 -> NULL
+    cout << "Resulting List: ";
+    display(head);
+
+    return 0;
+}`,
     cCode: `struct Node* temp = head;
 
 for (int i = 1; i < position - 1; i++) {
@@ -454,6 +1106,55 @@ temp.next = temp.next.next`,
         { label: '30', status: 'found' },
       ],
     },
+    cppCode: `#include <iostream>
+using namespace std;
+
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Search for a value in the linked list: O(n)
+bool search(Node* head, int key) {
+    Node* temp = head;
+    int position = 1;
+
+    // Traverse the list comparing each node's data
+    while (temp != nullptr) {
+        if (temp->data == key) {
+            cout << "Element " << key << " found at position " << position << "!" << endl;
+            return true;
+        }
+        temp = temp->next;
+        position++;
+    }
+
+    cout << "Element " << key << " not found in the list." << endl;
+    return false;
+}
+
+int main() {
+    // Initial List: 10 -> 20 -> 30 -> 40 -> NULL
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(30);
+    head->next->next->next = new Node(40);
+
+    cout << "List: 10 -> 20 -> 30 -> 40 -> NULL" << endl;
+
+    // Search for 30 (Present)
+    search(head, 30);
+
+    // Search for 50 (Not Present)
+    search(head, 50);
+
+    return 0;
+}`,
     cCode: `int search(struct Node* head, int key) {
     struct Node* temp = head;
 
@@ -506,6 +1207,46 @@ temp.next = temp.next.next`,
       listAscii: '10 → 20 → 30 → NULL',
       output: '10 20 30',
     },
+    cppCode: `#include <iostream>
+using namespace std;
+
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int value) {
+        data = value;
+        next = nullptr;
+    }
+};
+
+// Traverse and display all elements in the linked list: O(n)
+void display(Node* head) {
+    if (head == nullptr) {
+        cout << "List is empty: NULL" << endl;
+        return;
+    }
+
+    Node* temp = head;
+    cout << "List contents: ";
+    while (temp != nullptr) {
+        cout << temp->data << " ";
+        temp = temp->next; // Advance to next node
+    }
+    cout << endl;
+}
+
+int main() {
+    // Initial List: 10 -> 20 -> 30 -> NULL
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(30);
+
+    // Output: 10 20 30
+    display(head);
+
+    return 0;
+}`,
     cCode: `void display(struct Node* head) {
     struct Node* temp = head;
 
@@ -678,6 +1419,80 @@ temp.next = temp.next.next`,
         desc: 'Linked lists can be used to store multiple elements in the same hash-table bucket.',
       },
     ],
+    cppCode: `#include <iostream>
+using namespace std;
+
+// Application 1: Stack implementation using Singly Linked List
+struct Node {
+    int data;
+    Node* next;
+
+    Node(int val) {
+        data = val;
+        next = nullptr;
+    }
+};
+
+class Stack {
+private:
+    Node* top;
+
+public:
+    Stack() {
+        top = nullptr;
+    }
+
+    // Push: Insert at beginning - O(1)
+    void push(int val) {
+        Node* newNode = new Node(val);
+        newNode->next = top;
+        top = newNode;
+        cout << "Pushed: " << val << endl;
+    }
+
+    // Pop: Delete from beginning - O(1)
+    void pop() {
+        if (top == nullptr) {
+            cout << "Stack Underflow!" << endl;
+            return;
+        }
+        Node* temp = top;
+        top = top->next;
+        cout << "Popped: " << temp->data << endl;
+        delete temp;
+    }
+
+    // Peek top element - O(1)
+    int peek() {
+        if (top != nullptr) return top->data;
+        cout << "Stack is empty." << endl;
+        return -1;
+    }
+
+    bool isEmpty() {
+        return top == nullptr;
+    }
+
+    ~Stack() {
+        while (!isEmpty()) {
+            pop();
+        }
+    }
+};
+
+int main() {
+    Stack s;
+    s.push(10);
+    s.push(20);
+    s.push(30);
+
+    // Current stack: TOP -> 30 -> 20 -> 10 -> NULL
+    cout << "Top element (peek): " << s.peek() << endl; // 30
+    s.pop(); // Removes 30
+    cout << "After pop, new top: " << s.peek() << endl; // 20
+
+    return 0;
+}`,
   },
 
   // 15. QUICK REVISION
@@ -706,100 +1521,56 @@ temp.next = temp.next.next`,
                     └─────────┘`,
     quickRevisionConclusion:
       'The most important thing to understand: a singly linked list is simply a sequence of nodes where each node knows the address/reference of the next node.',
+    cppCode: `#include <iostream>
+using namespace std;
+
+// Quick Revision: Minimal Singly Linked List
+struct Node {
+    int data;
+    Node* next;
+    Node(int val) : data(val), next(nullptr) {}
+};
+
+// 1. Insert at Head - O(1)
+void insertHead(Node*& head, int val) {
+    Node* n = new Node(val);
+    n->next = head;
+    head = n;
+}
+
+// 2. Delete Head - O(1)
+void deleteHead(Node*& head) {
+    if (head != nullptr) {
+        Node* temp = head;
+        head = head->next;
+        delete temp;
+    }
+}
+
+// 3. Display - O(n)
+void printList(Node* head) {
+    for (Node* curr = head; curr != nullptr; curr = curr->next) {
+        cout << curr->data << " -> ";
+    }
+    cout << "NULL\\n";
+}
+
+int main() {
+    Node* head = nullptr;
+    insertHead(head, 30);
+    insertHead(head, 20);
+    insertHead(head, 10);
+    cout << "List after insertions: ";
+    printList(head); // 10 -> 20 -> 30 -> NULL
+
+    deleteHead(head);
+    cout << "List after deleting head: ";
+    printList(head); // 20 -> 30 -> NULL
+
+    return 0;
+}`,
   },
 ];
-
-// Helper Multi-Language Code Block with Tabs & Copy
-const MultiLanguageCodeBlock: React.FC<CodeBlockProps> = ({
-  cCode,
-  javaCode,
-  pythonCode,
-}) => {
-  const [selectedLang, setSelectedLang] = useState<'c' | 'java' | 'python'>('c');
-  const [copied, setCopied] = useState<boolean>(false);
-
-  const currentCode =
-    selectedLang === 'c' ? cCode : selectedLang === 'java' ? javaCode : pythonCode;
-
-  const handleCopy = () => {
-    if (!currentCode) return;
-    navigator.clipboard.writeText(currentCode);
-    soundManager.playClick();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="bg-slate-900 dark:bg-[#080D1F] border border-slate-700/60 dark:border-blue-900/40 rounded-xl overflow-hidden shadow-xs font-mono text-xs my-4">
-      {/* Tab bar header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-800/90 dark:bg-[#050816] border-b border-slate-700/50 dark:border-blue-900/30">
-        <div className="flex items-center gap-1.5">
-          {cCode && (
-            <button
-              onClick={() => setSelectedLang('c')}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                selectedLang === 'c'
-                  ? 'bg-blue-600 dark:bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 dark:hover:bg-[#0F1733]'
-              }`}
-            >
-              C
-            </button>
-          )}
-          {javaCode && (
-            <button
-              onClick={() => setSelectedLang('java')}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                selectedLang === 'java'
-                  ? 'bg-blue-600 dark:bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 dark:hover:bg-[#0F1733]'
-              }`}
-            >
-              Java
-            </button>
-          )}
-          {pythonCode && (
-            <button
-              onClick={() => setSelectedLang('python')}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                selectedLang === 'python'
-                  ? 'bg-blue-600 dark:bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 dark:hover:bg-[#0F1733]'
-              }`}
-            >
-              Python
-            </button>
-          )}
-        </div>
-
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-700/60 dark:bg-[#0F1733] hover:bg-slate-600 dark:hover:bg-[#152044] text-slate-300 dark:text-blue-300 text-[11px] transition-colors cursor-pointer"
-          title="Copy to Clipboard"
-        >
-          {copied ? (
-            <>
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400 font-bold">Copied!</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3.5 h-3.5" />
-              <span>Copy</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Code viewport */}
-      <div className="p-4 overflow-x-auto text-slate-100 dark:text-blue-100 leading-relaxed font-mono">
-        <pre>
-          <code>{currentCode}</code>
-        </pre>
-      </div>
-    </div>
-  );
-};
 
 export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
   initialTopic = 'theory-01',
@@ -838,8 +1609,8 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
 
   const completedChapters = pState.completedTheoryChapters || [];
   const isCurrentChapterCompleted = completedChapters.includes(activeChapter.id);
-  const totalCompletedCount = completedChapters.length;
-  const theoryPercentage = Math.round((totalCompletedCount / THEORY_CHAPTERS.length) * 100);
+  const totalCompletedCount = Math.min(TOTAL_CONCEPTS, completedChapters.length);
+  const theoryPercentage = Math.round((totalCompletedCount / TOTAL_CONCEPTS) * 100);
 
   // Hook for automatic scroll-to-reveal animations on chapter updates
   useScrollReveal([activeChapter.id]);
@@ -900,7 +1671,7 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
             </span>
           </div>
           <div className="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-[#080D1F] px-3 py-1 rounded-lg border border-slate-200 dark:border-blue-900/25">
-            Progress: <span className="text-blue-600 dark:text-blue-400 font-bold">{totalCompletedCount}</span> / 15 Sections ({theoryPercentage}%)
+            Progress: <span className="text-blue-600 dark:text-blue-400 font-bold">{totalCompletedCount}</span> / {TOTAL_CONCEPTS} Concepts ({theoryPercentage}%)
           </div>
         </div>
 
@@ -928,7 +1699,7 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
               Table of Contents
             </span>
             <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-medium">
-              15 Chapters
+              {TOTAL_CONCEPTS} Concepts
             </span>
           </div>
 
@@ -1196,16 +1967,15 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
             </div>
           )}
 
-          {/* Code Implementations (C, Java, Python) */}
-          {(activeChapter.cCode || activeChapter.javaCode || activeChapter.pythonCode) && (
-            <div className="space-y-2 reveal-on-scroll">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block font-mono">
-                Code Implementations (C / Java / Python)
-              </span>
-              <MultiLanguageCodeBlock
+          {/* CODE IMPLEMENTATIONS (C / C++ / JAVA / PYTHON) */}
+          {(activeChapter.cppCode || activeChapter.cCode || activeChapter.javaCode || activeChapter.pythonCode) && (
+            <div className="reveal-on-scroll">
+              <CodeImplementationSection
+                cppCode={activeChapter.cppCode}
                 cCode={activeChapter.cCode}
                 javaCode={activeChapter.javaCode}
                 pythonCode={activeChapter.pythonCode}
+                defaultLang="cpp"
               />
             </div>
           )}

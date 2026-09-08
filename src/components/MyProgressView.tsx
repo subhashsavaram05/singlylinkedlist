@@ -156,7 +156,7 @@ export const MyProgressView: React.FC<MyProgressViewProps> = ({ onNavigateToTab 
                   ★ Congratulations! 100% Curriculum Completed
                 </div>
                 <div className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
-                  You Have Mastered All 12 Hashing Modules & Activities
+                  You Have Mastered All {stats.theory.total} Concepts & Activities
                 </div>
               </div>
             </div>

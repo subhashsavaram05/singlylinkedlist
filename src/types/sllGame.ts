@@ -6,7 +6,19 @@ export interface SLLTeacherStep {
   title: string;
   what: string;
   why: string;
-  actionType: 'create_node' | 'set_head' | 'set_tail' | 'connect_next' | 'delete_node' | 'traverse_step' | 'search_step' | 'verify_null' | 'check_answer';
+  pointersUpdated?: string;
+  actionType:
+    | 'create_node'
+    | 'set_head'
+    | 'set_tail'
+    | 'connect_next'
+    | 'delete_node'
+    | 'select_node'
+    | 'highlight_target'
+    | 'traverse_step'
+    | 'search_step'
+    | 'verify_null'
+    | 'check_answer';
   targetAddress?: number | null;
   targetData?: number;
   targetPointer?: 'head' | 'tail' | 'next' | 'current';
@@ -15,6 +27,8 @@ export interface SLLTeacherStep {
   resultMessage: string;
   nextStepPreview: string;
   isCompleted: boolean;
+  highlightAddresses?: number[];
+  detachedAddress?: number | null;
 }
 
 export interface GuideStep {
@@ -22,7 +36,7 @@ export interface GuideStep {
   instruction: string;
   explanation: string;
   targetNodeAddress?: number | null; // which node to highlight
-  targetAction?: 'create' | 'click_node' | 'connect_next' | 'set_head' | 'set_tail' | 'delete' | 'search' | 'traverse' | 'choice';
+  targetAction?: 'create' | 'click_node' | 'select_node' | 'connect_next' | 'set_head' | 'set_tail' | 'delete' | 'search' | 'traverse' | 'choice';
   choiceOptions?: { label: string; value: any }[];
   highlightPointers?: ('head' | 'tail' | 'current' | 'next')[];
 }

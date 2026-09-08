@@ -1,12 +1,30 @@
 import { SLLNode, SLLPointerState, SLLTaskDef, SLLTeacherStep } from '../types/sllGame';
 
+// Helper to traverse ordered nodes from HEAD
+function getOrderedNodesList(nodes: SLLNode[] = [], pointers?: SLLPointerState): SLLNode[] {
+  const list: SLLNode[] = [];
+  const visited = new Set<number>();
+  let curr = pointers?.headAddress ?? (nodes[0] ? nodes[0].address : null);
+  while (curr !== null && !visited.has(curr)) {
+    visited.add(curr);
+    const node = nodes.find((n) => n.address === curr);
+    if (node) {
+      list.push(node);
+      curr = node.nextAddress;
+    } else {
+      break;
+    }
+  }
+  return list;
+}
+
 /**
  * Explicit Step Definitions for every Task in the game.
  * Guarantees a real step-based state machine with zero fake steps.
  */
 export const TASK_STEP_BUILDERS: Record<
   string,
-  (nodes: SLLNode[], pointers: SLLPointerState) => SLLTeacherStep[]
+  (nodes: SLLNode[], pointers: SLLPointerState, deletePosition?: number) => SLLTeacherStep[]
 > = {
   // ---------------------------------------------------------------------------
   // LEVEL 01 - TASK 01: Build First 2-Node Linked List [ 10 → 20 ]
@@ -195,139 +213,220 @@ export const TASK_STEP_BUILDERS: Record<
   // ---------------------------------------------------------------------------
   // LEVEL 02 - TASK 01: Delete from Beginning (HEAD Deletion)
   // ---------------------------------------------------------------------------
-  L2_T1: () => [
-    {
-      stepNumber: 1,
-      totalSteps: 2,
-      title: 'Advance HEAD Forward',
-      what: 'Move HEAD pointer forward to Node 10 (`head = head->next`, Address 1001).',
-      why: 'Advancing HEAD decouples the first node from the active list without breaking remaining links.',
-      actionType: 'set_head',
-      targetAddress: 1001,
-      targetPointer: 'head',
-      resultMessage: '✓ HEAD moved forward to Node 1001.',
-      nextStepPreview: 'Step 2: Delete/Free the detached Node 5 from RAM.',
-      isCompleted: false,
-    },
-    {
-      stepNumber: 2,
-      totalSteps: 2,
-      title: 'Free Detached Node (1000)',
-      what: 'Deallocate / delete Node 5 (Address 1000) from memory.',
-      why: 'In C/C++, `free(temp)` prevents memory leaks after removing a node.',
-      actionType: 'delete_node',
-      targetAddress: 1000,
-      resultMessage: '✓ Node 5 freed from RAM. Deletion from head completed!',
-      nextStepPreview: 'Task Finished!',
-      isCompleted: true,
-    },
-  ],
+  L2_T1: (nodes = [], pointers) => {
+    const chain = getOrderedNodesList(nodes, pointers);
+    const headNode =
+      chain[0] ||
+      (pointers?.headAddress ? nodes.find((n) => n.address === pointers.headAddress) : null) ||
+      nodes.find((n) => n.address === 1001) ||
+      nodes[0] ||
+      { id: 'n1', data: 10, address: 1001, nextAddress: 1002 };
+    const secondNode =
+      (headNode.nextAddress ? nodes.find((n) => n.address === headNode.nextAddress) : null) ||
+      chain[1] ||
+      nodes.find((n) => n.address === 1002) ||
+      { id: 'n2', data: 20, address: 1002, nextAddress: 1003 };
+
+    return [
+      {
+        stepNumber: 1,
+        totalSteps: 3,
+        title: 'Highlight ONLY First HEAD Node',
+        what: `Highlight ONLY the first HEAD node: Node [${headNode.data}] (Address ${headNode.address}).`,
+        why: 'Deletion at beginning begins by identifying and isolating the first node before modifying pointers.',
+        pointersUpdated: 'None yet (locating target node)',
+        actionType: 'select_node',
+        targetAddress: headNode.address,
+        targetData: headNode.data,
+        highlightAddresses: [headNode.address],
+        resultMessage: `✓ First HEAD Node [${headNode.data}] (Address ${headNode.address}) identified and highlighted.`,
+        nextStepPreview: `Step 2: Update HEAD to point to Node [${secondNode.data}] (HEAD.next).`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 2,
+        totalSteps: 3,
+        title: 'Update HEAD to HEAD.next',
+        what: `Update HEAD pointer to HEAD.next (Node [${secondNode.data}] at Address ${secondNode.address}).`,
+        why: 'Advancing HEAD decouples the first node from the active list without breaking remaining links.',
+        pointersUpdated: `HEAD = ${secondNode.address} (points to Node [${secondNode.data}])`,
+        actionType: 'set_head',
+        targetAddress: secondNode.address,
+        targetPointer: 'head',
+        highlightAddresses: [headNode.address, secondNode.address],
+        resultMessage: `✓ HEAD moved forward to Node [${secondNode.data}] (Address ${secondNode.address}). Old and new HEAD nodes highlighted.`,
+        nextStepPreview: `Step 3: Detach and delete the old HEAD Node [${headNode.data}].`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 3,
+        totalSteps: 3,
+        title: 'Detach and Delete Old HEAD Node',
+        what: `Detach and delete the old HEAD Node [${headNode.data}] (Address ${headNode.address}) from heap memory.`,
+        why: 'In C/C++, free(temp) deallocates memory and prevents leaks after removing the node from the list.',
+        pointersUpdated: `Old Node [${headNode.data}] deallocated (free(temp))`,
+        actionType: 'delete_node',
+        targetAddress: headNode.address,
+        highlightAddresses: [headNode.address],
+        detachedAddress: headNode.address,
+        resultMessage: `✓ Node [${headNode.data}] freed from RAM! Deletion from head completed.`,
+        nextStepPreview: 'Task Finished!',
+        isCompleted: true,
+      },
+    ];
+  },
 
   // ---------------------------------------------------------------------------
   // LEVEL 02 - TASK 02: Delete from End (TAIL Deletion)
   // ---------------------------------------------------------------------------
-  L2_T2: () => [
-    {
-      stepNumber: 1,
-      totalSteps: 3,
-      title: 'Set Second-to-Last Node NEXT to NULL',
-      what: 'Disconnect Node 20 by setting Node 10\'s NEXT pointer to NULL.',
-      why: 'Node 10 is becoming the new last node, so its NEXT must point to NULL.',
-      actionType: 'connect_next',
-      targetAddress: 1001,
-      nextAddress: null,
-      resultMessage: '✓ Node 10 NEXT set to NULL.',
-      nextStepPreview: 'Step 2: Move TAIL pointer backward to Node 10.',
-      isCompleted: false,
-    },
-    {
-      stepNumber: 2,
-      totalSteps: 3,
-      title: 'Update TAIL to Node 10',
-      what: 'Update TAIL pointer to Node 10 (Address 1001).',
-      why: 'TAIL must point to the new end of the list.',
-      actionType: 'set_tail',
-      targetAddress: 1001,
-      targetPointer: 'tail',
-      resultMessage: '✓ TAIL moved to Node 10 (Address 1001).',
-      nextStepPreview: 'Step 3: Free the disconnected old tail node.',
-      isCompleted: false,
-    },
-    {
-      stepNumber: 3,
-      totalSteps: 3,
-      title: 'Free Detached Node (1002)',
-      what: 'Deallocate / delete old tail Node 20 (Address 1002) from RAM.',
-      why: 'Freeing unused heap nodes prevents memory leaks.',
-      actionType: 'delete_node',
-      targetAddress: 1002,
-      resultMessage: '✓ Node 20 freed! Tail deletion complete.',
-      nextStepPreview: 'Task Finished!',
-      isCompleted: true,
-    },
-  ],
+  L2_T2: (nodes = [], pointers) => {
+    const chain = getOrderedNodesList(nodes, pointers);
+    const lastNode =
+      (pointers?.tailAddress ? nodes.find((n) => n.address === pointers.tailAddress) : null) ||
+      chain[chain.length - 1] ||
+      nodes.find((n) => n.address === 1003) ||
+      nodes[nodes.length - 1] ||
+      { id: 'n3', data: 30, address: 1003, nextAddress: null };
+    const secondLastNode =
+      chain.length >= 2
+        ? chain[chain.length - 2]
+        : nodes.find((n) => n.nextAddress === lastNode.address) ||
+          nodes.find((n) => n.address === 1002) ||
+          { id: 'n2', data: 20, address: 1002, nextAddress: 1003 };
+
+    return [
+      {
+        stepNumber: 1,
+        totalSteps: 4,
+        title: 'Identify and Highlight Last Node',
+        what: `Identify and highlight ONLY the last node: Node [${lastNode.data}] (Address ${lastNode.address}).`,
+        why: 'Deletion at ending targets the final node in the chain.',
+        pointersUpdated: 'None yet (locating target node)',
+        actionType: 'select_node',
+        targetAddress: lastNode.address,
+        targetData: lastNode.data,
+        highlightAddresses: [lastNode.address],
+        resultMessage: `✓ Last Node [${lastNode.data}] (Address ${lastNode.address}) identified and highlighted.`,
+        nextStepPreview: `Step 2: Update secondLast.next to NULL (Node [${secondLastNode.data}] NEXT = NULL).`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 2,
+        totalSteps: 4,
+        title: 'Update secondLast.next to NULL',
+        what: `Disconnect last node by setting Node [${secondLastNode.data}]'s NEXT pointer to NULL.`,
+        why: 'The second-to-last node is becoming the new terminator of the list, so its NEXT must point to NULL.',
+        pointersUpdated: `Node [${secondLastNode.data}] NEXT = NULL`,
+        actionType: 'connect_next',
+        targetAddress: secondLastNode.address,
+        nextAddress: null,
+        highlightAddresses: [secondLastNode.address, lastNode.address],
+        resultMessage: `✓ Node [${secondLastNode.data}] NEXT set to NULL. Last node is detached.`,
+        nextStepPreview: `Step 3: Move TAIL pointer to Node [${secondLastNode.data}].`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 3,
+        totalSteps: 4,
+        title: 'Update TAIL to Second-Last Node',
+        what: `Update TAIL pointer to the second-last Node [${secondLastNode.data}] (Address ${secondLastNode.address}).`,
+        why: 'TAIL must point to the new end of the list.',
+        pointersUpdated: `TAIL = ${secondLastNode.address} (points to Node [${secondLastNode.data}])`,
+        actionType: 'set_tail',
+        targetAddress: secondLastNode.address,
+        targetPointer: 'tail',
+        highlightAddresses: [secondLastNode.address],
+        resultMessage: `✓ TAIL moved to Node [${secondLastNode.data}] (Address ${secondLastNode.address}).`,
+        nextStepPreview: `Step 4: Free the detached old tail Node [${lastNode.data}].`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 4,
+        totalSteps: 4,
+        title: 'Detach and Delete Last Node',
+        what: `Deallocate / delete old tail Node [${lastNode.data}] (Address ${lastNode.address}) from RAM.`,
+        why: 'Freeing unused heap nodes prevents memory leaks.',
+        pointersUpdated: `Old Node [${lastNode.data}] deallocated (free(tail))`,
+        actionType: 'delete_node',
+        targetAddress: lastNode.address,
+        highlightAddresses: [lastNode.address],
+        detachedAddress: lastNode.address,
+        resultMessage: `✓ Node [${lastNode.data}] freed! Tail deletion complete.`,
+        nextStepPreview: 'Task Finished!',
+        isCompleted: true,
+      },
+    ];
+  },
 
   // ---------------------------------------------------------------------------
-  // LEVEL 02 - TASK 03: Delete Single-Node List (Boundary Case)
+  // LEVEL 02 - TASK 03: Empty List Condition (Underflow Guard)
   // ---------------------------------------------------------------------------
   L2_T3: () => [
     {
       stepNumber: 1,
-      totalSteps: 3,
-      title: 'Set HEAD to NULL',
-      what: 'Set HEAD pointer to NULL.',
-      why: 'Removing the only node leaves the list empty, so HEAD must be NULL.',
-      actionType: 'set_head',
+      totalSteps: 1,
+      title: 'Empty List Guard Check',
+      what: 'List is empty. Cannot delete.',
+      why: 'When HEAD == NULL, attempting to access head->next causes a null pointer dereference (segmentation fault). Check if (head == NULL) before deleting.',
+      pointersUpdated: 'HEAD == NULL, TAIL == NULL',
+      actionType: 'verify_null',
       targetAddress: null,
-      targetPointer: 'head',
-      resultMessage: '✓ HEAD set to NULL.',
-      nextStepPreview: 'Step 2: Set TAIL to NULL.',
-      isCompleted: false,
-    },
-    {
-      stepNumber: 2,
-      totalSteps: 3,
-      title: 'Set TAIL to NULL',
-      what: 'Set TAIL pointer to NULL.',
-      why: 'An empty list has no tail node.',
-      actionType: 'set_tail',
-      targetAddress: null,
-      targetPointer: 'tail',
-      resultMessage: '✓ TAIL set to NULL.',
-      nextStepPreview: 'Step 3: Free the node from RAM.',
-      isCompleted: false,
-    },
-    {
-      stepNumber: 3,
-      totalSteps: 3,
-      title: 'Free Solitary Node (1001)',
-      what: 'Free Node 10 (Address 1001) from memory.',
-      why: 'Heap memory must be released.',
-      actionType: 'delete_node',
-      targetAddress: 1001,
-      resultMessage: '✓ Node 10 freed! List is safely empty.',
+      resultMessage: '✓ Underflow guarded: "List is empty. Cannot delete."',
       nextStepPreview: 'Task Finished!',
       isCompleted: true,
     },
   ],
 
   // ---------------------------------------------------------------------------
-  // LEVEL 02 - TASK 04: Delete from Empty List (Underflow Guard)
+  // LEVEL 02 - TASK 04: Delete Single-Node List (Boundary Case)
   // ---------------------------------------------------------------------------
-  L2_T4: () => [
-    {
-      stepNumber: 1,
-      totalSteps: 1,
-      title: 'Verify Underflow Guard',
-      what: 'Verify that HEAD == NULL before attempting deletion.',
-      why: 'Attempting to delete from an empty list triggers Underflow (Segmentation Fault).',
-      actionType: 'verify_null',
-      targetAddress: null,
-      resultMessage: '✓ Underflow check passed! `if (head == NULL) return;` prevents crash.',
-      nextStepPreview: 'Task Finished!',
-      isCompleted: true,
-    },
-  ],
+  L2_T4: (nodes = []) => {
+    const onlyNode = nodes[0] || { id: 'n1', data: 10, address: 1001, nextAddress: null };
+    return [
+      {
+        stepNumber: 1,
+        totalSteps: 3,
+        title: 'Highlight the Only Node',
+        what: `Highlight the solitary Node [${onlyNode.data}] (Address ${onlyNode.address}).`,
+        why: 'In a 1-node list, HEAD and TAIL both point to the same node.',
+        pointersUpdated: 'None yet',
+        actionType: 'select_node',
+        targetAddress: onlyNode.address,
+        highlightAddresses: [onlyNode.address],
+        resultMessage: `✓ Solitary Node [${onlyNode.data}] (Address ${onlyNode.address}) highlighted.`,
+        nextStepPreview: `Step 2: Delete Node [${onlyNode.data}].`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 2,
+        totalSteps: 3,
+        title: 'Delete Node',
+        what: `Delete Node [${onlyNode.data}] (Address ${onlyNode.address}) from heap memory.`,
+        why: 'Releases the allocated heap memory (free(head)).',
+        pointersUpdated: `Node [${onlyNode.data}] deallocated`,
+        actionType: 'delete_node',
+        targetAddress: onlyNode.address,
+        highlightAddresses: [onlyNode.address],
+        detachedAddress: onlyNode.address,
+        resultMessage: `✓ Node [${onlyNode.data}] deleted from heap memory.`,
+        nextStepPreview: 'Step 3: Update HEAD = NULL and TAIL = NULL.',
+        isCompleted: false,
+      },
+      {
+        stepNumber: 3,
+        totalSteps: 3,
+        title: 'Update HEAD = NULL and TAIL = NULL',
+        what: 'Update HEAD = NULL and TAIL = NULL.',
+        why: 'When the only node is deleted, both HEAD and TAIL must be reset to NULL to represent an empty list.',
+        pointersUpdated: 'HEAD = NULL, TAIL = NULL',
+        actionType: 'set_head',
+        targetAddress: null,
+        resultMessage: '✓ HEAD = NULL and TAIL = NULL. List is safely empty.',
+        nextStepPreview: 'Task Finished!',
+        isCompleted: true,
+      },
+    ];
+  },
 
   // ---------------------------------------------------------------------------
   // LEVEL 03 - TASK 01: Traversal Stream
@@ -335,52 +434,75 @@ export const TASK_STEP_BUILDERS: Record<
   L3_T1: () => [
     {
       stepNumber: 1,
-      totalSteps: 4,
-      title: 'Initialize CURRENT to HEAD',
-      what: 'Point CURRENT pointer to HEAD (Node 10, Address 1001).',
+      totalSteps: 5,
+      title: 'Select the HEAD Node',
+      what: 'Select the HEAD node (Node 10 at Address 1001).',
       why: 'Traversal always begins at the starting address stored in HEAD.',
+      pointersUpdated: 'CURRENT = 1001 (points to Node 10)',
       actionType: 'traverse_step',
       targetAddress: 1001,
       targetData: 10,
-      resultMessage: '✓ CURRENT initialized to Node 1001. Streamed DATA: 10.',
-      nextStepPreview: 'Step 2: Advance CURRENT to Node 20 (Address 1002).',
+      highlightAddresses: [1001],
+      resultMessage: '✓ CURRENT initialized to Node 10 (Address 1001). Streamed DATA: 10.',
+      nextStepPreview: 'Step 2: Follow NEXT pointer and select Node 20 (Address 1002).',
       isCompleted: false,
     },
     {
       stepNumber: 2,
-      totalSteps: 4,
-      title: 'Advance CURRENT to Node 20',
-      what: 'Advance CURRENT to `current->next` (Node 20, Address 1002).',
-      why: 'Following NEXT steps to the next contiguous logical element in the chain.',
+      totalSteps: 5,
+      title: 'Move CURRENT to Node 20',
+      what: 'Follow NEXT pointer and select Node 20 (Address 1002).',
+      why: 'Node 10 has NEXT = 1002. Advancing `current = current->next` moves CURRENT to Node 20.',
+      pointersUpdated: 'CURRENT = 1002 (points to Node 20)',
       actionType: 'traverse_step',
       targetAddress: 1002,
       targetData: 20,
-      resultMessage: '✓ CURRENT moved to Node 1002. Streamed DATA: 20.',
-      nextStepPreview: 'Step 3: Advance CURRENT to Node 30 (Address 1003).',
+      highlightAddresses: [1001, 1002],
+      resultMessage: '✓ CURRENT moved to Node 20 (Address 1002). Streamed DATA: 20.',
+      nextStepPreview: 'Step 3: Follow NEXT pointer and select Node 30 (Address 1003).',
       isCompleted: false,
     },
     {
       stepNumber: 3,
-      totalSteps: 4,
-      title: 'Advance CURRENT to Node 30',
-      what: 'Advance CURRENT to `current->next` (Node 30, Address 1003).',
-      why: 'Reading the node value and advancing pointer.',
+      totalSteps: 5,
+      title: 'Move CURRENT to Node 30',
+      what: 'Follow NEXT pointer and select Node 30 (Address 1003).',
+      why: 'Node 20 has NEXT = 1003. Advancing `current = current->next` moves CURRENT to Node 30.',
+      pointersUpdated: 'CURRENT = 1003 (points to Node 30)',
       actionType: 'traverse_step',
       targetAddress: 1003,
       targetData: 30,
-      resultMessage: '✓ CURRENT moved to Node 1003. Streamed DATA: 30.',
-      nextStepPreview: 'Step 4: Reach end of list (NULL).',
+      highlightAddresses: [1002, 1003],
+      resultMessage: '✓ CURRENT moved to Node 30 (Address 1003). Streamed DATA: 30.',
+      nextStepPreview: 'Step 4: Follow NEXT pointer and select Node 40 (Address 1004).',
       isCompleted: false,
     },
     {
       stepNumber: 4,
-      totalSteps: 4,
-      title: 'Terminate Traversal at NULL',
-      what: 'CURRENT encounters NULL (`current == NULL`), stopping the loop.',
-      why: 'While loop `while (current != NULL)` terminates when reaching the end.',
+      totalSteps: 5,
+      title: 'Move CURRENT to Node 40',
+      what: 'Follow NEXT pointer and select Node 40 (Address 1004).',
+      why: 'Node 30 has NEXT = 1004. Advancing `current = current->next` moves CURRENT to Node 40.',
+      pointersUpdated: 'CURRENT = 1004 (points to Node 40)',
+      actionType: 'traverse_step',
+      targetAddress: 1004,
+      targetData: 40,
+      highlightAddresses: [1003, 1004],
+      resultMessage: '✓ CURRENT moved to Node 40 (Address 1004). Streamed DATA: 40.',
+      nextStepPreview: 'Final Step: Move CURRENT to NULL.',
+      isCompleted: false,
+    },
+    {
+      stepNumber: 5,
+      totalSteps: 5,
+      title: 'Move CURRENT to NULL',
+      what: 'Node 40 has NEXT = NULL. Select NULL to complete traversal.',
+      why: 'When CURRENT reaches NULL (`current == NULL`), the traversal loop finishes.',
+      pointersUpdated: 'CURRENT = NULL',
       actionType: 'traverse_step',
       targetAddress: null,
-      resultMessage: '✓ Traversal complete! Output stream: [10, 20, 30].',
+      highlightAddresses: [1004],
+      resultMessage: '✓ Traversal complete! Output stream: [10, 20, 30, 40] → NULL.',
       nextStepPreview: 'Task Finished!',
       isCompleted: true,
     },
@@ -419,35 +541,257 @@ export const TASK_STEP_BUILDERS: Record<
   ],
 
   // ---------------------------------------------------------------------------
-  // LEVEL 04 - TASK 02: Delete in Middle
+  // LEVEL 04 - TASK 02: Delete at Any Position (Middle Deletion)
   // ---------------------------------------------------------------------------
-  L4_T2: () => [
-    {
-      stepNumber: 1,
-      totalSteps: 2,
-      title: 'Bypass Middle Node',
-      what: 'Connect Node 10 (Address 1001) NEXT directly to Node 30 (Address 1003).',
-      why: 'Bypassing Node 20 (`prev->next = current->next`) cuts it out of the linked chain.',
-      actionType: 'connect_next',
-      targetAddress: 1001,
-      nextAddress: 1003,
-      resultMessage: '✓ Node 10 now points directly to Node 30. Node 20 is bypassed.',
-      nextStepPreview: 'Step 2: Free detached Node 20 from RAM.',
-      isCompleted: false,
-    },
-    {
-      stepNumber: 2,
-      totalSteps: 2,
-      title: 'Free Detached Node (1002)',
-      what: 'Free Node 20 (Address 1002) from RAM.',
-      why: 'Deallocating the unlinked node prevents memory leaks.',
-      actionType: 'delete_node',
-      targetAddress: 1002,
-      resultMessage: '✓ Node 20 freed! Middle deletion completed.',
-      nextStepPreview: 'Task Finished!',
-      isCompleted: true,
-    },
-  ],
+  L4_T2: (nodes = [], pointers, deletePosition = 2) => {
+    let chain = getOrderedNodesList(nodes, pointers);
+    if (chain.length === 0) {
+      chain = nodes.length > 0 ? [...nodes] : [
+        { id: 'n1', data: 10, address: 1001, nextAddress: 1002 },
+        { id: 'n2', data: 20, address: 1002, nextAddress: 1003 },
+        { id: 'n3', data: 30, address: 1003, nextAddress: 1004 },
+        { id: 'n4', data: 40, address: 1004, nextAddress: 1005 },
+        { id: 'n5', data: 50, address: 1005, nextAddress: null },
+      ];
+    }
+
+    const validPos = Math.max(1, Math.min(chain.length, deletePosition));
+    const targetIndex = validPos - 1;
+    const targetNode = chain[targetIndex] || chain[0];
+
+    // Case 1: Position = 1 (Delete at Beginning)
+    if (validPos === 1) {
+      const nextNode = chain[1] || null;
+      return [
+        {
+          stepNumber: 1,
+          totalSteps: 4,
+          title: 'Highlight Target Node to Delete',
+          what: `Highlight ONLY the HEAD / first node at Position 1: Node [${targetNode.data}] (Address ${targetNode.address}).`,
+          why: 'Locating the target node by position is the first step before updating adjacent pointers.',
+          pointersUpdated: 'None yet (locating target node)',
+          actionType: 'select_node',
+          targetAddress: targetNode.address,
+          targetData: targetNode.data,
+          highlightAddresses: [targetNode.address],
+          resultMessage: `✓ Target Node [${targetNode.data}] (Position 1) identified and highlighted.`,
+          nextStepPreview: nextNode ? `Step 2: Advance HEAD to Node [${nextNode.data}].` : 'Step 2: Set HEAD = NULL.',
+          isCompleted: false,
+        },
+        {
+          stepNumber: 2,
+          totalSteps: 4,
+          title: 'Advance HEAD Pointer',
+          what: nextNode
+            ? `Update HEAD = target.next (advance HEAD to Node [${nextNode.data}] at Address ${nextNode.address}).`
+            : 'Update HEAD = NULL (list becomes empty).',
+          why: 'Preserves the access point to the rest of the list.',
+          pointersUpdated: `HEAD = ${nextNode ? nextNode.address : 'NULL'}`,
+          actionType: 'set_head',
+          targetAddress: nextNode ? nextNode.address : null,
+          highlightAddresses: nextNode ? [targetNode.address, nextNode.address] : [targetNode.address],
+          resultMessage: `✓ HEAD pointer updated to ${nextNode ? `Node [${nextNode.data}]` : 'NULL'}!`,
+          nextStepPreview: 'Step 3: Detach target node.',
+          isCompleted: false,
+        },
+        {
+          stepNumber: 3,
+          totalSteps: 4,
+          title: 'Detach Target Node',
+          what: `Detach target Node [${targetNode.data}] by clearing its NEXT pointer (NEXT = NULL).`,
+          why: 'Visually separates the target node from the active list.',
+          pointersUpdated: `Target Node [${targetNode.data}] NEXT = NULL (detached)`,
+          actionType: 'connect_next',
+          targetAddress: targetNode.address,
+          nextAddress: null,
+          highlightAddresses: [targetNode.address],
+          detachedAddress: targetNode.address,
+          resultMessage: `✓ Target Node [${targetNode.data}] detached and shown separately.`,
+          nextStepPreview: 'Step 4: Delete target node from RAM.',
+          isCompleted: false,
+        },
+        {
+          stepNumber: 4,
+          totalSteps: 4,
+          title: 'Delete Target Node',
+          what: `Deallocate Node [${targetNode.data}] from heap memory (free(target)).`,
+          why: 'Releases allocated memory, completing deletion at beginning.',
+          pointersUpdated: `Target Node [${targetNode.data}] deallocated (free(target))`,
+          actionType: 'delete_node',
+          targetAddress: targetNode.address,
+          highlightAddresses: [],
+          detachedAddress: targetNode.address,
+          resultMessage: `✓ Node [${targetNode.data}] freed from memory! Deletion at beginning completed.`,
+          nextStepPreview: 'Task Finished!',
+          isCompleted: true,
+        },
+      ];
+    }
+
+    // Case 2: Position = Last (Delete at Ending)
+    if (validPos === chain.length) {
+      const prevNode = chain[targetIndex - 1];
+      return [
+        {
+          stepNumber: 1,
+          totalSteps: 5,
+          title: 'Highlight Target Node to Delete',
+          what: `Highlight ONLY the TAIL / last node at Position ${validPos}: Node [${targetNode.data}] (Address ${targetNode.address}).`,
+          why: 'Locating the target node by position is the first step before updating adjacent pointers.',
+          pointersUpdated: 'None yet (locating target node)',
+          actionType: 'select_node',
+          targetAddress: targetNode.address,
+          targetData: targetNode.data,
+          highlightAddresses: [targetNode.address],
+          resultMessage: `✓ Target TAIL Node [${targetNode.data}] (Position ${validPos}) identified and highlighted.`,
+          nextStepPreview: `Step 2: Identify previous node [${prevNode.data}] and target node [${targetNode.data}].`,
+          isCompleted: false,
+        },
+        {
+          stepNumber: 2,
+          totalSteps: 5,
+          title: 'Identify Adjacent Nodes',
+          what: `Highlight Previous Node [${prevNode.data}] (${prevNode.address}) and Target Node [${targetNode.data}] (${targetNode.address}).`,
+          why: 'Locates the second-to-last node whose NEXT pointer must become NULL.',
+          pointersUpdated: 'Nodes referenced: prev, target',
+          actionType: 'select_node',
+          targetAddress: prevNode.address,
+          highlightAddresses: [prevNode.address, targetNode.address],
+          resultMessage: `✓ Previous [${prevNode.data}] and Target [${targetNode.data}] identified.`,
+          nextStepPreview: `Step 3: Update pointer previous.next = NULL.`,
+          isCompleted: false,
+        },
+        {
+          stepNumber: 3,
+          totalSteps: 5,
+          title: 'Update Pointer',
+          what: `Update pointer: previous.next = NULL (Node [${prevNode.data}] NEXT = NULL) and set TAIL = ${prevNode.address}.`,
+          why: 'Makes the second-to-last node the new end of the list.',
+          pointersUpdated: `Node [${prevNode.data}] NEXT = NULL, TAIL = ${prevNode.address}`,
+          actionType: 'connect_next',
+          targetAddress: prevNode.address,
+          nextAddress: null,
+          highlightAddresses: [prevNode.address],
+          resultMessage: `✓ Node [${prevNode.data}] is now the new end of list with NEXT = NULL.`,
+          nextStepPreview: `Step 4: Detach target Node [${targetNode.data}].`,
+          isCompleted: false,
+        },
+        {
+          stepNumber: 4,
+          totalSteps: 5,
+          title: 'Detach Target Node',
+          what: `Show Node [${targetNode.data}] as DETACHED.`,
+          why: 'Visually separates the target node from the active list before deallocation.',
+          pointersUpdated: `Target Node [${targetNode.data}] NEXT = NULL (detached)`,
+          actionType: 'connect_next',
+          targetAddress: targetNode.address,
+          nextAddress: null,
+          highlightAddresses: [targetNode.address],
+          detachedAddress: targetNode.address,
+          resultMessage: `✓ Target Node [${targetNode.data}] detached.`,
+          nextStepPreview: `Step 5: Delete target Node [${targetNode.data}] from memory.`,
+          isCompleted: false,
+        },
+        {
+          stepNumber: 5,
+          totalSteps: 5,
+          title: 'Delete Target Node',
+          what: `Delete target Node [${targetNode.data}] (Address ${targetNode.address}) from heap memory (free(target)).`,
+          why: 'Releases allocated memory, completing deletion at end.',
+          pointersUpdated: `Target Node [${targetNode.data}] deallocated (free(target))`,
+          actionType: 'delete_node',
+          targetAddress: targetNode.address,
+          highlightAddresses: [],
+          detachedAddress: targetNode.address,
+          resultMessage: `✓ Node [${targetNode.data}] freed from memory! Deletion at ending completed.`,
+          nextStepPreview: 'Task Finished!',
+          isCompleted: true,
+        },
+      ];
+    }
+
+    // Case 3: Middle Deletion (1 < validPos < chain.length)
+    const prevNode = chain[targetIndex - 1];
+    const nextNode = chain[targetIndex + 1];
+
+    return [
+      {
+        stepNumber: 1,
+        totalSteps: 5,
+        title: 'Highlight Target Node to Delete',
+        what: `Highlight ONLY the target node to delete at position ${validPos}: Node [${targetNode.data}] (Address ${targetNode.address}).`,
+        why: 'Locating the target node by position is the first step before updating adjacent pointers.',
+        pointersUpdated: 'None yet (locating target node)',
+        actionType: 'select_node',
+        targetAddress: targetNode.address,
+        targetData: targetNode.data,
+        highlightAddresses: [targetNode.address],
+        resultMessage: `✓ Target Node [${targetNode.data}] (Address ${targetNode.address}) identified and highlighted.`,
+        nextStepPreview: `Step 2: Identify adjacent nodes: Previous [${prevNode.data}], Target [${targetNode.data}], and Next [${nextNode.data}].`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 2,
+        totalSteps: 5,
+        title: 'Identify Adjacent Nodes',
+        what: `Highlight ONLY Previous Node [${prevNode.data}] (${prevNode.address}), Target Node [${targetNode.data}] (${targetNode.address}), and Next Node [${nextNode.data}] (${nextNode.address}).`,
+        why: 'To bridge pointers around the target node, we must identify both the predecessor and successor nodes.',
+        pointersUpdated: 'Nodes referenced: prev, target, next',
+        actionType: 'select_node',
+        targetAddress: prevNode.address,
+        highlightAddresses: [prevNode.address, targetNode.address, nextNode.address],
+        resultMessage: `✓ Previous [${prevNode.data}], Target [${targetNode.data}], and Next [${nextNode.data}] identified.`,
+        nextStepPreview: `Step 3: Update pointer previous.next = target.next ([${prevNode.data}] → [${nextNode.data}]).`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 3,
+        totalSteps: 5,
+        title: 'Update Pointer',
+        what: `Perform: previous.next = target.next. Change [${prevNode.data}] → [${targetNode.data}] to [${prevNode.data}] → [${nextNode.data}] at Address ${nextNode.address}.`,
+        why: 'Bypasses the target node so the list remains continuously connected without breaking subsequent links.',
+        pointersUpdated: `Node [${prevNode.data}] NEXT = ${nextNode.address} (points to Node [${nextNode.data}])`,
+        actionType: 'connect_next',
+        targetAddress: prevNode.address,
+        nextAddress: nextNode.address,
+        highlightAddresses: [prevNode.address, nextNode.address],
+        resultMessage: `✓ Pointer bridged! Node [${prevNode.data}] now points directly to Node [${nextNode.data}].`,
+        nextStepPreview: `Step 4: Detach target Node [${targetNode.data}].`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 4,
+        totalSteps: 5,
+        title: 'Detach Target Node',
+        what: `Node [${targetNode.data}] should visually disconnect from the linked list. Show [${prevNode.data}] → [${nextNode.data}] and separately: [${targetNode.data}] DETACHED.`,
+        why: 'Clears the outgoing pointer from the target node, completely separating it from the active chain.',
+        pointersUpdated: `Target Node [${targetNode.data}] NEXT = NULL (detached)`,
+        actionType: 'connect_next',
+        targetAddress: targetNode.address,
+        nextAddress: null,
+        highlightAddresses: [targetNode.address],
+        detachedAddress: targetNode.address,
+        resultMessage: `✓ Target Node [${targetNode.data}] detached and shown separately.`,
+        nextStepPreview: `Step 5: Delete target Node [${targetNode.data}] from RAM.`,
+        isCompleted: false,
+      },
+      {
+        stepNumber: 5,
+        totalSteps: 5,
+        title: 'Delete Target Node',
+        what: `Remove Node [${targetNode.data}] (Address ${targetNode.address}) from RAM (free(target)).`,
+        why: 'Releases the allocated heap memory, completing deletion at position.',
+        pointersUpdated: `Target Node [${targetNode.data}] deallocated (free(target))`,
+        actionType: 'delete_node',
+        targetAddress: targetNode.address,
+        highlightAddresses: [],
+        detachedAddress: targetNode.address,
+        resultMessage: `✓ Node [${targetNode.data}] freed from memory! Deletion at position ${validPos} completed.`,
+        nextStepPreview: 'Task Finished!',
+        isCompleted: true,
+      },
+    ];
+  },
 
   // ---------------------------------------------------------------------------
   // LEVEL 04 - TASK 03: Linear Search
@@ -800,17 +1144,29 @@ export const TASK_STEP_BUILDERS: Record<
   ],
 };
 
+// Aliases for Deletion operations to match concept IDs
+if (TASK_STEP_BUILDERS['L2_T1']) {
+  TASK_STEP_BUILDERS['delete-beginning'] = TASK_STEP_BUILDERS['L2_T1'];
+}
+if (TASK_STEP_BUILDERS['L2_T2']) {
+  TASK_STEP_BUILDERS['delete-end'] = TASK_STEP_BUILDERS['L2_T2'];
+}
+if (TASK_STEP_BUILDERS['L4_T2']) {
+  TASK_STEP_BUILDERS['delete-position'] = TASK_STEP_BUILDERS['L4_T2'];
+}
+
 /**
  * Returns all step definitions for a task.
  */
 export function getAllTaskSteps(
   task: SLLTaskDef,
   nodes: SLLNode[] = [],
-  pointers: SLLPointerState = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null }
+  pointers: SLLPointerState = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null },
+  deletePosition: number = 2
 ): SLLTeacherStep[] {
   const builder = TASK_STEP_BUILDERS[task.id];
   if (builder) {
-    return builder(nodes, pointers);
+    return builder(nodes, pointers, deletePosition);
   }
 
   // Fallback synthesis if task has guideSteps
@@ -853,9 +1209,10 @@ export function getTaskStep(
   task: SLLTaskDef,
   stepNumber: number,
   nodes: SLLNode[] = [],
-  pointers: SLLPointerState = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null }
+  pointers: SLLPointerState = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null },
+  deletePosition: number = 2
 ): SLLTeacherStep | null {
-  const steps = getAllTaskSteps(task, nodes, pointers);
+  const steps = getAllTaskSteps(task, nodes, pointers, deletePosition);
   const found = steps.find((s) => s.stepNumber === stepNumber);
   if (found) return found;
   if (stepNumber >= 1 && stepNumber <= steps.length) {
@@ -867,8 +1224,13 @@ export function getTaskStep(
 /**
  * Returns total steps for a task.
  */
-export function getTaskTotalSteps(task: SLLTaskDef): number {
-  const steps = getAllTaskSteps(task);
+export function getTaskTotalSteps(
+  task: SLLTaskDef,
+  nodes: SLLNode[] = [],
+  pointers: SLLPointerState = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null },
+  deletePosition: number = 2
+): number {
+  const steps = getAllTaskSteps(task, nodes, pointers, deletePosition);
   return steps.length;
 }
 
@@ -913,12 +1275,21 @@ export function executeSingleTeacherStep(
 
     case 'set_head': {
       newPointers.headAddress = step.targetAddress !== undefined ? step.targetAddress : null;
+      if (step.targetAddress === null && (step.title?.includes('TAIL = NULL') || step.what?.includes('TAIL = NULL'))) {
+        newPointers.tailAddress = null;
+      }
       // Do not silently set tail here so tasks teaching HEAD and TAIL can teach them as separate steps
       break;
     }
 
     case 'set_tail': {
       newPointers.tailAddress = step.targetAddress !== undefined ? step.targetAddress : null;
+      break;
+    }
+
+    case 'select_node':
+    case 'highlight_target': {
+      // Step to identify / highlight target node - acknowledge action
       break;
     }
 
@@ -935,7 +1306,9 @@ export function executeSingleTeacherStep(
 
     case 'delete_node': {
       if (step.targetAddress !== undefined && step.targetAddress !== null) {
-        newNodes = newNodes.filter((n) => n.address !== step.targetAddress);
+        newNodes = newNodes
+          .filter((n) => n.address !== step.targetAddress)
+          .map((n) => (n.nextAddress === step.targetAddress ? { ...n, nextAddress: null } : n));
         if (newPointers.headAddress === step.targetAddress) newPointers.headAddress = null;
         if (newPointers.tailAddress === step.targetAddress) newPointers.tailAddress = null;
         if (newPointers.currentAddress === step.targetAddress) newPointers.currentAddress = null;
@@ -994,9 +1367,10 @@ export function getNextTeacherStep(
   traversalOutput: number[] = [],
   searchResult: string = 'idle',
   searchCurrentNode: SLLNode | null = null,
-  currentStepIndex: number = 1
+  currentStepIndex: number = 1,
+  deletePosition: number = 2
 ): SLLTeacherStep | null {
-  return getTaskStep(task, currentStepIndex, nodes, pointers);
+  return getTaskStep(task, currentStepIndex, nodes, pointers, deletePosition);
 }
 
 /**
@@ -1006,14 +1380,15 @@ export function getContextualPlayAdvice(
   task: SLLTaskDef,
   nodes: SLLNode[],
   pointers: SLLPointerState,
-  currentStep: number = 1
+  currentStep: number = 1,
+  deletePosition: number = 2
 ): {
   primaryInstruction: string;
   recommendedAction: 'create_node' | 'connect_next' | 'set_head' | 'set_tail' | 'delete_node' | 'traverse' | 'search' | 'check_answer';
   targetAddress?: number | null;
   targetData?: number;
 } {
-  const step = getTaskStep(task, currentStep, nodes, pointers);
+  const step = getTaskStep(task, currentStep, nodes, pointers, deletePosition);
   if (!step) {
     return {
       primaryInstruction: 'All operations look complete! Click CHECK ANSWER to verify.',
@@ -1051,6 +1426,13 @@ export function getContextualPlayAdvice(
       return {
         primaryInstruction: `Click Node ${step.targetAddress} and select Delete Node`,
         recommendedAction: 'delete_node',
+        targetAddress: step.targetAddress,
+      };
+    case 'select_node':
+    case 'highlight_target':
+      return {
+        primaryInstruction: step.what,
+        recommendedAction: 'check_answer',
         targetAddress: step.targetAddress,
       };
     case 'verify_null':

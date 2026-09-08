@@ -2,15 +2,17 @@ import { ModuleRecord, ModuleStatus, UserProgressState } from '../types/game';
 
 const STORAGE_KEY = 'hash_quest_field_notes_progress_v2';
 
+export const TOTAL_CONCEPTS = 15;
+
 export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent'>[] = [
   {
     id: 'fn-01-basics',
     number: '01',
     code: 'FN-01',
-    title: 'WHAT IS HASHING? & O(1) ACCESS',
+    title: 'INTRODUCTION TO SINGLY LINKED LIST',
     category: 'FOUNDATION',
-    description: 'Understand direct addressing, hash tables, and why hash lookups operate in average O(1) constant time.',
-    criteriaDescription: 'Read the foundation theory and complete the interactive O(1) vs O(n) lookup speed race.',
+    description: 'Understand node architecture (DATA + NEXT), heap memory allocations, and why the last node points to NULL.',
+    criteriaDescription: 'Read the foundation theory and understand sequential pointer navigation.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-01',
   },
@@ -18,10 +20,10 @@ export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent
     id: 'fn-02-modulo',
     number: '02',
     code: 'FN-02',
-    title: 'THE HASH FUNCTION & MODULO',
+    title: 'OPERATIONS OF SINGLY LINKED LIST',
     category: 'FOUNDATION',
-    description: 'Master the core modulus formula: h(key) = key mod table size to map numbers into array bounds.',
-    criteriaDescription: 'Use the interactive modulo arithmetic calculator with at least 2 distinct keys and table sizes.',
+    description: 'Overview of standard Singly Linked List primitives: Insertion, Deletion, Search, and Traversal.',
+    criteriaDescription: 'Study the primary operation categories and pointer manipulation fundamentals.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-02',
   },
@@ -29,10 +31,10 @@ export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent
     id: 'fn-03-table',
     number: '03',
     code: 'FN-03',
-    title: 'THE HASH TABLE ARCHITECTURE',
-    category: 'FOUNDATION',
-    description: 'Associative data structures mapping keys to values using contiguous array storage and direct addressing.',
-    criteriaDescription: 'Study the hash table architecture, key-value storage, and direct memory translation.',
+    title: 'INSERTION AT THE BEGINNING',
+    category: 'TECHNIQUE',
+    description: 'Constant O(1) time insertion at the HEAD: newNode.next = HEAD, HEAD = newNode.',
+    criteriaDescription: 'Master prepending nodes and instant HEAD pointer re-assignment.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-03',
   },
@@ -40,10 +42,10 @@ export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent
     id: 'fn-04-lifecycle',
     number: '04',
     code: 'FN-04',
-    title: 'THE HASHING LIFECYCLE PIPELINE',
-    category: 'FOUNDATION',
-    description: 'Master the 4-step pipeline for every Insert, Search, and Delete operation.',
-    criteriaDescription: 'Inspect the step-by-step hashing pipeline from key input to memory placement.',
+    title: 'INSERTION AT THE END',
+    category: 'TECHNIQUE',
+    description: 'Traverse to the final node or use a TAIL pointer to connect newNode and maintain NULL termination.',
+    criteriaDescription: 'Inspect end-of-list traversal, TAIL updates, and boundary conditions.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-04',
   },
@@ -51,54 +53,54 @@ export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent
     id: 'fn-05-collision',
     number: '05',
     code: 'FN-05',
-    title: 'WHAT IS A COLLISION & PARADOX',
-    category: 'FOUNDATION',
-    description: 'The mathematical inevitability of collisions under the Pigeonhole Principle and Birthday Paradox.',
-    criteriaDescription: 'Understand why collisions occur and why resolution strategies are essential.',
+    title: 'INSERTION AT ANY POSITION',
+    category: 'TECHNIQUE',
+    description: 'Traverse to position (k-1) and splice the new node safely: newNode.next = prev.next, prev.next = newNode.',
+    criteriaDescription: 'Master arbitrary position insertion and pointer sequencing to prevent memory leaks.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-05',
   },
   {
-    id: 'fn-06-chaining',
+    id: 'delete-beginning',
     number: '06',
     code: 'FN-06',
-    title: 'SEPARATE CHAINING (CLOSED ADDR)',
+    title: 'Delete at Beginning',
     category: 'TECHNIQUE',
-    description: 'Closed addressing strategy where each slot holds a linked list to gracefully store colliding elements.',
-    criteriaDescription: 'Master linked bucket insertion and collision resolution.',
+    description: 'Constant O(1) deletion at the HEAD: advance HEAD = HEAD.next and free original memory.',
+    criteriaDescription: 'Master fast HEAD removal and single-node edge case handling.',
     targetTab: 'THEORY',
-    targetChapterId: 'theory-06',
+    targetChapterId: 'delete-beginning',
   },
   {
-    id: 'fn-07-linear',
+    id: 'delete-end',
     number: '07',
     code: 'FN-07',
-    title: 'LINEAR PROBING (OPEN ADDRESSING)',
+    title: 'Delete at End',
     category: 'TECHNIQUE',
-    description: 'Open addressing algorithm searching sequentially (+1, +2...) for the nearest open slot upon collision.',
-    criteriaDescription: 'Master sequential slot searching and probe sequence calculation.',
+    description: 'Traverse to the second-to-last node, set its next pointer to NULL, and deallocate the old TAIL.',
+    criteriaDescription: 'Master sequential scanning to locate the predecessor and update the TAIL.',
     targetTab: 'THEORY',
-    targetChapterId: 'theory-07',
+    targetChapterId: 'delete-end',
   },
   {
-    id: 'fn-08-quadratic',
+    id: 'delete-position',
     number: '08',
     code: 'FN-08',
-    title: 'QUADRATIC PROBING (SQUARE LEAPS)',
+    title: 'Delete at Any Position',
     category: 'TECHNIQUE',
-    description: 'Leaping open addressing using square increments (+1², +2², +3²) to avoid primary clustering.',
-    criteriaDescription: 'Master square leap probing and secondary clustering mitigation.',
+    description: 'Navigate to node (k-1) and bypass target node: prev.next = target.next, then delete target.',
+    criteriaDescription: 'Master intermediate node bypass and boundary safety validation.',
     targetTab: 'THEORY',
-    targetChapterId: 'theory-08',
+    targetChapterId: 'delete-position',
   },
   {
     id: 'fn-09-double',
     number: '09',
     code: 'FN-09',
-    title: 'DOUBLE HASHING (DUAL FUNCTION)',
+    title: 'SEARCHING IN SINGLY LINKED LIST',
     category: 'TECHNIQUE',
-    description: 'Advanced dual-hash resolution where a second function h2(key) computes a unique non-zero jump interval.',
-    criteriaDescription: 'Master dual-hash computation and step size calculation.',
+    description: 'Linear sequential scan from HEAD comparing node.data === key until found or reaching NULL.',
+    criteriaDescription: 'Master linear search traversal, hit detection, and miss termination.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-09',
   },
@@ -106,10 +108,10 @@ export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent
     id: 'fn-10-realworld',
     number: '10',
     code: 'FN-10',
-    title: 'REAL-WORLD APPLICATIONS',
+    title: 'DISPLAY & TRAVERSAL',
     category: 'ANALYSIS',
-    description: 'Explore databases, compilers, caches, and distributed consistent hashing in production systems.',
-    criteriaDescription: 'Study industry use cases and production hash table deployments.',
+    description: 'Step through every node using a temporary pointer: while (temp != NULL) print(temp.data).',
+    criteriaDescription: 'Study iterative sequential printing and pointer advancement.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-10',
   },
@@ -117,10 +119,10 @@ export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent
     id: 'fn-11-advantages',
     number: '11',
     code: 'FN-11',
-    title: 'CORE ADVANTAGES & PERFORMANCE',
+    title: 'TIME & SPACE COMPLEXITIES',
     category: 'ANALYSIS',
-    description: 'Deep dive into algorithmic complexity: average O(1) vs worst-case O(n) trade-offs.',
-    criteriaDescription: 'Analyze time complexities, space requirements, and hardware cache efficiency.',
+    description: 'Analyze operation complexities: O(1) vs O(N) access/search and pointer overhead.',
+    criteriaDescription: 'Analyze time complexities, space requirements, and hardware memory layout.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-11',
   },
@@ -128,12 +130,45 @@ export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent
     id: 'fn-12-tradeoffs',
     number: '12',
     code: 'FN-12',
-    title: 'LIMITATIONS & TRADEOFFS',
+    title: 'ADVANTAGES OF SINGLY LINKED LIST',
     category: 'ANALYSIS',
-    description: 'Understand unsorted keys, lack of range queries, rehashing overhead, and cryptographic hashing.',
-    criteriaDescription: 'Analyze memory overhead, range search limits, and load factor thresholds.',
+    description: 'Dynamic sizing, non-contiguous memory, fast beginning insertion/deletion without array shifts.',
+    criteriaDescription: 'Analyze flexibility, dynamic expansion, and ease of modification.',
     targetTab: 'THEORY',
     targetChapterId: 'theory-12',
+  },
+  {
+    id: 'fn-13-disadvantages',
+    number: '13',
+    code: 'FN-13',
+    title: 'DISADVANTAGES OF SINGLY LINKED LIST',
+    category: 'ANALYSIS',
+    description: 'No direct random index access, O(N) searching, extra memory per pointer, forward-only movement.',
+    criteriaDescription: 'Understand tradeoffs, lack of index jumping, and pointer management risks.',
+    targetTab: 'THEORY',
+    targetChapterId: 'theory-13',
+  },
+  {
+    id: 'fn-14-applications',
+    number: '14',
+    code: 'FN-14',
+    title: 'APPLICATIONS OF SINGLY LINKED LIST',
+    category: 'ANALYSIS',
+    description: 'Stack/queue implementations, polynomial representations, adjacency lists, and hash chaining.',
+    criteriaDescription: 'Inspect real-world systems, dynamic data structures, and chained buckets.',
+    targetTab: 'THEORY',
+    targetChapterId: 'theory-14',
+  },
+  {
+    id: 'fn-15-revision',
+    number: '15',
+    code: 'FN-15',
+    title: 'QUICK REVISION & CORE RULES',
+    category: 'EXAMINATION',
+    description: 'Core memory model: Node = Data + Next, Head = First, NULL = End, Insert = Connect, Delete = Bypass.',
+    criteriaDescription: 'Review the 5 fundamental rules and minimal C++/Java/Python implementations.',
+    targetTab: 'THEORY',
+    targetChapterId: 'theory-15',
   },
 ];
 
@@ -152,6 +187,9 @@ const INITIAL_PROGRESS: UserProgressState = {
     'fn-10-realworld': 'NOT_STARTED',
     'fn-11-advantages': 'NOT_STARTED',
     'fn-12-tradeoffs': 'NOT_STARTED',
+    'fn-13-disadvantages': 'NOT_STARTED',
+    'fn-14-applications': 'NOT_STARTED',
+    'fn-15-revision': 'NOT_STARTED',
   },
   moduleProgress: {},
   completedTheoryChapters: [],
@@ -179,22 +217,36 @@ export const THEORY_ID_MAP: Record<string, string> = {
   'hash-table': 'theory-03',
   'hashing-lifecycle': 'theory-04',
   'what-is-a-collision': 'theory-05',
-  'separate-chaining': 'theory-06',
-  'linear-probing': 'theory-07',
-  'quadratic-probing': 'theory-08',
+  'separate-chaining': 'delete-beginning',
+  'linear-probing': 'delete-end',
+  'quadratic-probing': 'delete-position',
   'double-hashing': 'theory-09',
   'real-world-applications': 'theory-10',
   'core-advantages': 'theory-11',
   'limitations-tradeoffs': 'theory-12',
-  'load-factor': 'theory-08',
+  'load-factor': 'delete-position',
+  // Deletion aliases
+  'deletion': 'deletion',
+  'delete-operations': 'deletion',
+  'deletion-operations': 'deletion',
+  'delete-beginning': 'delete-beginning',
+  'delete-at-beginning': 'delete-beginning',
+  'deletion-at-beginning': 'delete-beginning',
+  'delete-end': 'delete-end',
+  'delete-at-end': 'delete-end',
+  'deletion-at-end': 'delete-end',
+  'delete-position': 'delete-position',
+  'delete-at-position': 'delete-position',
+  'delete-at-any-position': 'delete-position',
+  'deletion-at-any-position': 'delete-position',
   '01': 'theory-01',
   '02': 'theory-02',
   '03': 'theory-03',
   '04': 'theory-04',
   '05': 'theory-05',
-  '06': 'theory-06',
-  '07': 'theory-07',
-  '08': 'theory-08',
+  '06': 'delete-beginning',
+  '07': 'delete-end',
+  '08': 'delete-position',
   '09': 'theory-09',
   '10': 'theory-10',
   '11': 'theory-11',
@@ -207,9 +259,9 @@ export const THEORY_ID_MAP: Record<string, string> = {
   'theory-03': 'theory-03',
   'theory-04': 'theory-04',
   'theory-05': 'theory-05',
-  'theory-06': 'theory-06',
-  'theory-07': 'theory-07',
-  'theory-08': 'theory-08',
+  'theory-06': 'delete-beginning',
+  'theory-07': 'delete-end',
+  'theory-08': 'delete-position',
   'theory-09': 'theory-09',
   'theory-10': 'theory-10',
   'theory-11': 'theory-11',
@@ -221,8 +273,12 @@ export const THEORY_ID_MAP: Record<string, string> = {
 
 export const normalizeTheoryChapterId = (idOrSlug: string): string => {
   if (!idOrSlug) return 'theory-01';
+  if (THEORY_ID_MAP[idOrSlug]) return THEORY_ID_MAP[idOrSlug];
+  if (idOrSlug === 'theory-06') return 'delete-beginning';
+  if (idOrSlug === 'theory-07') return 'delete-end';
+  if (idOrSlug === 'theory-08') return 'delete-position';
   if (idOrSlug.startsWith('theory-')) return idOrSlug;
-  return THEORY_ID_MAP[idOrSlug] || idOrSlug;
+  return idOrSlug;
 };
 
 type ProgressListener = (state: UserProgressState) => void;
@@ -293,13 +349,13 @@ class ProgressManager {
     return JSON.parse(JSON.stringify(this.state));
   }
 
-  // 1. THEORY STATS (12 Modules)
+  // 1. THEORY STATS (15 Concepts)
   public getTheoryStats() {
     const list = Array.isArray(this.state.completedTheoryChapters)
       ? Array.from(new Set(this.state.completedTheoryChapters))
       : [];
-    const completed = Math.min(12, list.length);
-    const total = 12;
+    const completed = Math.min(TOTAL_CONCEPTS, list.length);
+    const total = TOTAL_CONCEPTS;
     const percentage = Math.round((completed / total) * 100);
     return {
       total,
@@ -365,7 +421,7 @@ class ProgressManager {
     };
   }
 
-  // ALL 12 MODULES
+  // ALL 15 MODULES
   public getModules(): ModuleRecord[] {
     const theoryDone = this.state.completedTheoryChapters || [];
     const levelsDone = this.state.levelsCompleted || [];
@@ -376,13 +432,19 @@ class ProgressManager {
       'fn-03-table': 'theory-03',
       'fn-04-lifecycle': 'theory-04',
       'fn-05-collision': 'theory-05',
-      'fn-06-chaining': 'theory-06',
-      'fn-07-linear': 'theory-07',
-      'fn-08-quadratic': 'theory-08',
+      'delete-beginning': 'delete-beginning',
+      'fn-06-chaining': 'delete-beginning',
+      'delete-end': 'delete-end',
+      'fn-07-linear': 'delete-end',
+      'delete-position': 'delete-position',
+      'fn-08-quadratic': 'delete-position',
       'fn-09-double': 'theory-09',
       'fn-10-realworld': 'theory-10',
       'fn-11-advantages': 'theory-11',
       'fn-12-tradeoffs': 'theory-12',
+      'fn-13-disadvantages': 'theory-13',
+      'fn-14-applications': 'theory-14',
+      'fn-15-revision': 'theory-15',
     };
 
     return FIELD_NOTES_MODULES.map((m) => {
@@ -390,13 +452,13 @@ class ProgressManager {
       let progressPercent = this.state.moduleProgress[m.id] || 0;
       const chapterId = moduleMapping[m.id];
 
-      if (chapterId && theoryDone.includes(chapterId)) {
+      if (chapterId && (theoryDone.includes(chapterId) || (chapterId === 'delete-beginning' && theoryDone.includes('theory-06')) || (chapterId === 'delete-end' && theoryDone.includes('theory-07')) || (chapterId === 'delete-position' && theoryDone.includes('theory-08')))) {
         status = 'COMPLETED';
         progressPercent = 100;
       }
 
       // Also support game level masteries for interactive modules
-      if (m.id === 'fn-06-chaining' && levelsDone.includes(2)) {
+      if ((m.id === 'delete-beginning' || m.id === 'fn-06-chaining') && levelsDone.includes(2)) {
         status = this.state.levelsMastered.includes(2) ? 'MASTERED' : 'COMPLETED';
         progressPercent = 100;
       } else if (m.id === 'fn-07-linear' && levelsDone.includes(3)) {
@@ -424,22 +486,22 @@ class ProgressManager {
     });
   }
 
-  // OVERALL PROGRESS (20 Unique Activities)
+  // OVERALL PROGRESS (Total Activities)
   public getStats() {
     const theory = this.getTheoryStats();
     const video = this.getVideoStats();
     const game = this.getGameStats();
     const quiz = this.getQuizStats();
 
-    // Exactly 20 distinct measurable learning activities:
-    // 12 Theory Modules + 5 Game Levels + 2 Videos + 1 Quiz
-    const total = 20;
+    // Total distinct measurable learning activities:
+    // 15 Theory Concepts + 5 Game Levels + 2 Videos + 1 Quiz = 23
+    const total = theory.total + video.total + game.total + quiz.total;
     const completed = theory.completed + video.completed + game.completed + quiz.completed;
     const isAllComplete =
-      theory.completed === 12 &&
-      video.completed === 2 &&
-      game.completed === 5 &&
-      quiz.completed === 1;
+      theory.completed === theory.total &&
+      video.completed === video.total &&
+      game.completed === game.total &&
+      quiz.completed === quiz.total;
 
     // Strict 100% calculation: exactly 100% ONLY when every activity is finished
     const percentage = isAllComplete
@@ -499,13 +561,19 @@ class ProgressManager {
       'theory-03': 'fn-03-table',
       'theory-04': 'fn-04-lifecycle',
       'theory-05': 'fn-05-collision',
-      'theory-06': 'fn-06-chaining',
-      'theory-07': 'fn-07-linear',
-      'theory-08': 'fn-08-quadratic',
+      'delete-beginning': 'delete-beginning',
+      'theory-06': 'delete-beginning',
+      'delete-end': 'delete-end',
+      'theory-07': 'delete-end',
+      'delete-position': 'delete-position',
+      'theory-08': 'delete-position',
       'theory-09': 'fn-09-double',
       'theory-10': 'fn-10-realworld',
       'theory-11': 'fn-11-advantages',
       'theory-12': 'fn-12-tradeoffs',
+      'theory-13': 'fn-13-disadvantages',
+      'theory-14': 'fn-14-applications',
+      'theory-15': 'fn-15-revision',
     };
 
     const targetModuleId = chapterToModuleMap[normalized];

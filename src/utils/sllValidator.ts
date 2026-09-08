@@ -67,7 +67,8 @@ export function validateTaskAnswer(
   nodes: SLLNode[],
   pointers: SLLPointerState,
   traversalOutput: number[] = [],
-  searchCompleted: boolean = false
+  searchCompleted: boolean = false,
+  customDeletePosition?: number
 ): SLLValidationResult {
   const analysis = analyzeLinkedList(nodes, pointers);
   const { orderedData, visitedAddresses, orphanedNodes, hasCycle, lastVisitedAddress } = analysis;
@@ -323,6 +324,56 @@ export function validateTaskAnswer(
           title: 'HEAD or TAIL Missing',
           message: 'Both HEAD and TAIL pointers must be set.',
           explanation: 'Set HEAD to the first node address and TAIL to the last node address.',
+        },
+        ...analysis,
+      };
+    }
+  }
+
+  // L4_T2: Delete at Any Position dynamic validation
+  if (task.id === 'L4_T2' || task.targetCondition.customValidator === 'L4_T2_DELETE_ANY') {
+    const pos = customDeletePosition ?? 2;
+    const initialList = [10, 20, 30, 40, 50];
+    const targetIdx = Math.max(0, Math.min(initialList.length - 1, pos - 1));
+    const targetVal = initialList[targetIdx];
+    const expectedOrder = initialList.filter((_, idx) => idx !== targetIdx);
+
+    if (orphanedNodes.length > 0) {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'Orphaned Node Detected',
+          message: `Node(s) at address [${orphanedNodes.map((n) => n.address).join(', ')}] are not reachable from HEAD.`,
+          explanation: `Ensure the detached node is completely deleted from RAM and predecessor is linked to successor.`,
+        },
+        ...analysis,
+      };
+    }
+
+    const isOrderMatch =
+      orderedData.length === expectedOrder.length &&
+      expectedOrder.every((val, idx) => orderedData[idx] === val);
+
+    if (isOrderMatch) {
+      return {
+        isValid: true,
+        feedback: {
+          type: 'success',
+          title: 'Position Deletion Complete! 🎉',
+          message: `Node [${targetVal}] at Position ${pos} was successfully removed. Remaining list: [${orderedData.join(' → ')} → NULL].`,
+          explanation: 'You successfully bridged adjacent pointers and freed the target node in O(N) traversal time!',
+        },
+        ...analysis,
+      };
+    } else {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'List Sequence Mismatch',
+          message: `Current list: [${orderedData.join(' → ')}]. Expected after deleting Position ${pos} (Node [${targetVal}]): [${expectedOrder.join(' → ')}].`,
+          explanation: `Locate the node at Position ${pos}, bridge previous->next = target->next, and delete the target node.`,
         },
         ...analysis,
       };

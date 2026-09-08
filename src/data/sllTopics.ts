@@ -60,21 +60,24 @@ export const SLL_TOPICS: Record<SLLTopicId, SLLTopic> = {
     badge: 'Master Level',
     tasks: [
       {
-        id: 'L2_T1',
+        id: 'delete-beginning',
+        legacyId: 'L2_T1',
         taskNumber: 1,
         title: 'Delete at Beginning',
         description: 'Advance HEAD pointer to the next node and release the old head node\'s memory back to the Heap in O(1) time.',
         xpReward: 40,
       },
       {
-        id: 'L2_T2',
+        id: 'delete-end',
+        legacyId: 'L2_T2',
         taskNumber: 2,
         title: 'Delete at End',
         description: 'Traverse to the second-to-last node, set its NEXT to NULL, and free the former TAIL node.',
         xpReward: 45,
       },
       {
-        id: 'L4_T2',
+        id: 'delete-position',
+        legacyId: 'L4_T2',
         taskNumber: 3,
         title: 'Delete at Any Position',
         description: 'Bridge the pointer from the predecessor directly to the successor, then free the targeted node.',

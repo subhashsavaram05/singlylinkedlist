@@ -129,6 +129,18 @@ export const SLLTeacherBanner: React.FC<SLLTeacherBannerProps> = ({
             </p>
           </div>
 
+          {/* POINTERS UPDATED */}
+          {step.pointersUpdated && (
+            <div className="flex items-start gap-2">
+              <span className="px-2 py-0.5 rounded-md bg-white/90 dark:bg-[#2A1D0D] border border-blue-400 text-blue-700 dark:text-blue-300 font-mono text-[10px] font-bold shrink-0 mt-0.5">
+                POINTERS
+              </span>
+              <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed font-semibold">
+                {step.pointersUpdated}
+              </p>
+            </div>
+          )}
+
           {/* Last Step Result (if any) */}
           <AnimatePresence>
             {lastActionResult && (

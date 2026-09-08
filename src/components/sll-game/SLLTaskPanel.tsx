@@ -45,11 +45,15 @@ interface SLLTaskPanelProps {
   // Traversal & Search Interactive Props
   currentTraversalStep?: number;
   onTraversalAnswer?: (answer: string) => void;
+  traversalOutput?: number[];
+  traversalNextExpectedAddr?: number | null;
+  onTraversalNullClick?: () => void;
   searchStepPrompt?: {
     currentData: number;
     targetData: number;
   } | null;
   onSearchAnswer?: (isMatch: boolean) => void;
+  deletePosition?: number;
 }
 
 export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
@@ -75,15 +79,19 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
   hasNextTask,
   currentTraversalStep,
   onTraversalAnswer,
+  traversalOutput,
+  traversalNextExpectedAddr,
+  onTraversalNullClick,
   searchStepPrompt,
   onSearchAnswer,
+  deletePosition = 2,
 }) => {
   // Check target condition completion in real time for beginner feedback
   const target = task.targetCondition;
   const isCountOk = target.nodeCount === undefined || nodes.length === target.nodeCount;
   const isHeadOk = target.headAddress === undefined || pointers.headAddress === target.headAddress;
   const isTailOk = target.tailAddress === undefined || pointers.tailAddress === target.tailAddress;
-  const allSteps = getAllTaskSteps(task, nodes, pointers);
+  const allSteps = getAllTaskSteps(task, nodes, pointers, deletePosition);
 
   return (
     <div className="w-full flex flex-col gap-4 font-sans">
@@ -281,37 +289,67 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
         </motion.div>
       )}
 
-      {/* Traversal Step Q&A Prompt (Level 3 / Mission 7) */}
-      {task.targetCondition.customValidator === 'L3_TRAVERSAL_COMPLETE' && onTraversalAnswer && (
+      {/* Traversal Step Guide & Output Stream (Level 3 / Mission 7) */}
+      {(task.targetCondition.customValidator === 'L3_TRAVERSAL_COMPLETE' || task.id === 'L3_T1') && (
         <div className="p-4 rounded-3xl bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-500/30 shadow-xs">
-          <div className="flex items-center gap-2 mb-2 font-mono font-bold text-xs text-cyan-800 dark:text-cyan-300">
-            <Eye className="w-4 h-4" />
-            <span>TRAVERSAL QUESTION:</span>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 font-mono font-bold text-xs text-cyan-800 dark:text-cyan-300">
+              <Eye className="w-4 h-4" />
+              <span>STEP-BY-STEP TRAVERSAL:</span>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-200/70 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200">
+              {pointers.currentAddress === null && traversalOutput && traversalOutput.length > 0
+                ? 'COMPLETED'
+                : `STEP ${currentStep} OF 5`}
+            </span>
           </div>
 
           <p className="text-xs text-slate-700 dark:text-slate-200 mb-3 font-medium">
             {pointers.currentAddress === null
-              ? 'HEAD contains which address to start traversal?'
-              : `CURRENT is at Node ${pointers.currentAddress}. What address should CURRENT move to next?`}
+              ? traversalOutput && traversalOutput.length > 0
+                ? '✓ Traversal complete! All nodes were visited and streamed in order.'
+                : 'Click the HEAD node (Node 10) directly in the RAM workspace to begin traversal.'
+              : `CURRENT is at Node ${nodes.find((n) => n.address === pointers.currentAddress)?.data ?? pointers.currentAddress}. Follow its NEXT pointer and click the next node in the workspace.`}
           </p>
 
-          <div className="flex flex-wrap gap-2">
-            {nodes.map((n) => (
+          {/* Live Output Stream */}
+          {traversalOutput && traversalOutput.length > 0 && (
+            <div className="mb-3 p-2.5 rounded-2xl bg-white dark:bg-[#0B1228] border border-cyan-200 dark:border-cyan-900/40">
+              <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 block mb-1">
+                OUTPUT STREAM:
+              </span>
+              <div className="flex items-center flex-wrap gap-1.5 font-mono text-xs font-bold text-cyan-700 dark:text-cyan-300">
+                {traversalOutput.map((val, idx) => (
+                  <React.Fragment key={idx}>
+                    <span className="px-2 py-0.5 rounded-lg bg-cyan-100 dark:bg-cyan-950 border border-cyan-300 dark:border-cyan-800">
+                      {val}
+                    </span>
+                    {idx < traversalOutput.length - 1 && <span className="text-slate-400">→</span>}
+                  </React.Fragment>
+                ))}
+                {isCompleted && <span className="text-rose-500 font-mono">→ NULL</span>}
+              </div>
+            </div>
+          )}
+
+          {/* Option to select NULL if at last node */}
+          {pointers.currentAddress !== null &&
+            nodes.find((n) => n.address === pointers.currentAddress)?.nextAddress === null && (
               <button
-                key={n.address}
-                onClick={() => onTraversalAnswer(String(n.address))}
-                className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#0E1736] border border-cyan-300 dark:border-cyan-500/40 text-xs font-mono font-bold text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 shadow-xs"
+                type="button"
+                onClick={() => {
+                  if (onTraversalNullClick) {
+                    onTraversalNullClick();
+                  } else if (onTraversalAnswer) {
+                    onTraversalAnswer('NULL');
+                  }
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-mono font-bold transition-colors shadow-xs flex items-center justify-center gap-1.5 animate-pulse cursor-pointer"
               >
-                {n.address} [Data: {n.data}]
+                <span>Select NULL (Finish Traversal)</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            ))}
-            <button
-              onClick={() => onTraversalAnswer('NULL')}
-              className="px-3 py-1.5 rounded-xl bg-rose-100 dark:bg-rose-950 border border-rose-300 dark:border-rose-500/40 text-xs font-mono font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-200 shadow-xs"
-            >
-              NULL (End of List)
-            </button>
-          </div>
+            )}
         </div>
       )}
 
