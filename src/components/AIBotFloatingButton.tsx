@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, Sparkles, RotateCcw, ChevronDown, MessageCircle } from 'lucide-react';
+import { X, Send, Sparkles, RotateCcw, ChevronDown } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface ChatMessage {
@@ -337,13 +337,40 @@ export const AIBotFloatingButton: React.FC = () => {
         type="button"
         aria-label="AlgoLearn AI Assistant"
         onClick={handleToggle}
-        className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 lg:bottom-6 lg:right-6 z-40 w-[56px] h-[56px] sm:w-[60px] sm:h-[60px] lg:w-[64px] lg:h-[64px] rounded-full p-0 flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95 bg-linear-to-br from-[#2563EB] via-[#6366F1] to-[#9333EA] shadow-[0_8px_25px_rgba(37,99,235,0.4),0_4px_12px_rgba(147,51,234,0.3)] hover:shadow-[0_12px_32px_rgba(37,99,235,0.5),0_6px_16px_rgba(147,51,234,0.4)] focus:outline-hidden focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900 select-none group"
+        className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 lg:bottom-6 lg:right-6 z-40 w-[56px] h-[56px] sm:w-[60px] sm:h-[60px] lg:w-[64px] lg:h-[64px] rounded-full p-0 flex items-center justify-center cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shadow-[0_8px_25px_rgba(59,130,246,0.38),0_4px_12px_rgba(139,92,246,0.28)] hover:shadow-[0_12px_32px_rgba(59,130,246,0.5),0_6px_16px_rgba(139,92,246,0.38)] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900 select-none"
       >
-        <MessageCircle className="w-7 h-7 sm:w-7.5 sm:h-7.5 lg:w-8 lg:h-8 text-white stroke-[2.2] transition-transform duration-300 group-hover:scale-110" />
+        <svg
+          viewBox="0 0 100 100"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-full h-full rounded-full overflow-hidden block"
+        >
+          <defs>
+            {/* Blue to Purple Gradient matching master reference image */}
+            <linearGradient id="aiChatBgGrad" x1="15%" y1="12%" x2="85%" y2="88%">
+              <stop offset="0%" stopColor="#2264F6" />
+              <stop offset="48%" stopColor="#5542EE" />
+              <stop offset="100%" stopColor="#8726E8" />
+            </linearGradient>
+          </defs>
+
+          {/* 1. Base Circular Gradient Background */}
+          <circle cx="50" cy="50" r="50" fill="url(#aiChatBgGrad)" />
+
+          {/* 2. White Outlined Chat Bubble Symbol matching reference image */}
+          <path
+            d="M 45.0 67.8 C 40.5 68.5, 36.0 70.5, 33.0 70.2 C 31.2 69.8, 31.0 66.8, 32.6 64.0 C 33.4 62.8, 34.2 62.0, 35.1 61.5 A 19.5 19.5 0 1 1 45.0 67.8 Z"
+            stroke="#FFFFFF"
+            strokeWidth="5.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </svg>
 
         {/* Small active indicator if chat is currently open */}
         {isOpen && (
-          <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white dark:border-[#0A1024] shadow-xs" />
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white dark:border-[#0A1024] shadow-xs" />
         )}
       </button>
     </>

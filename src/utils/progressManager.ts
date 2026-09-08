@@ -61,37 +61,37 @@ export const FIELD_NOTES_MODULES: Omit<ModuleRecord, 'status' | 'progressPercent
     targetChapterId: 'theory-05',
   },
   {
-    id: 'delete-beginning',
+    id: 'fn-06-chaining',
     number: '06',
     code: 'FN-06',
-    title: 'Delete at Beginning',
+    title: 'DELETION AT THE BEGINNING',
     category: 'TECHNIQUE',
     description: 'Constant O(1) deletion at the HEAD: advance HEAD = HEAD.next and free original memory.',
     criteriaDescription: 'Master fast HEAD removal and single-node edge case handling.',
     targetTab: 'THEORY',
-    targetChapterId: 'delete-beginning',
+    targetChapterId: 'theory-06',
   },
   {
-    id: 'delete-end',
+    id: 'fn-07-linear',
     number: '07',
     code: 'FN-07',
-    title: 'Delete at End',
+    title: 'DELETION AT THE END',
     category: 'TECHNIQUE',
     description: 'Traverse to the second-to-last node, set its next pointer to NULL, and deallocate the old TAIL.',
     criteriaDescription: 'Master sequential scanning to locate the predecessor and update the TAIL.',
     targetTab: 'THEORY',
-    targetChapterId: 'delete-end',
+    targetChapterId: 'theory-07',
   },
   {
-    id: 'delete-position',
+    id: 'fn-08-quadratic',
     number: '08',
     code: 'FN-08',
-    title: 'Delete at Any Position',
+    title: 'DELETION AT ANY POSITION',
     category: 'TECHNIQUE',
     description: 'Navigate to node (k-1) and bypass target node: prev.next = target.next, then delete target.',
     criteriaDescription: 'Master intermediate node bypass and boundary safety validation.',
     targetTab: 'THEORY',
-    targetChapterId: 'delete-position',
+    targetChapterId: 'theory-08',
   },
   {
     id: 'fn-09-double',
@@ -217,36 +217,22 @@ export const THEORY_ID_MAP: Record<string, string> = {
   'hash-table': 'theory-03',
   'hashing-lifecycle': 'theory-04',
   'what-is-a-collision': 'theory-05',
-  'separate-chaining': 'delete-beginning',
-  'linear-probing': 'delete-end',
-  'quadratic-probing': 'delete-position',
+  'separate-chaining': 'theory-06',
+  'linear-probing': 'theory-07',
+  'quadratic-probing': 'theory-08',
   'double-hashing': 'theory-09',
   'real-world-applications': 'theory-10',
   'core-advantages': 'theory-11',
   'limitations-tradeoffs': 'theory-12',
-  'load-factor': 'delete-position',
-  // Deletion aliases
-  'deletion': 'deletion',
-  'delete-operations': 'deletion',
-  'deletion-operations': 'deletion',
-  'delete-beginning': 'delete-beginning',
-  'delete-at-beginning': 'delete-beginning',
-  'deletion-at-beginning': 'delete-beginning',
-  'delete-end': 'delete-end',
-  'delete-at-end': 'delete-end',
-  'deletion-at-end': 'delete-end',
-  'delete-position': 'delete-position',
-  'delete-at-position': 'delete-position',
-  'delete-at-any-position': 'delete-position',
-  'deletion-at-any-position': 'delete-position',
+  'load-factor': 'theory-08',
   '01': 'theory-01',
   '02': 'theory-02',
   '03': 'theory-03',
   '04': 'theory-04',
   '05': 'theory-05',
-  '06': 'delete-beginning',
-  '07': 'delete-end',
-  '08': 'delete-position',
+  '06': 'theory-06',
+  '07': 'theory-07',
+  '08': 'theory-08',
   '09': 'theory-09',
   '10': 'theory-10',
   '11': 'theory-11',
@@ -259,9 +245,9 @@ export const THEORY_ID_MAP: Record<string, string> = {
   'theory-03': 'theory-03',
   'theory-04': 'theory-04',
   'theory-05': 'theory-05',
-  'theory-06': 'delete-beginning',
-  'theory-07': 'delete-end',
-  'theory-08': 'delete-position',
+  'theory-06': 'theory-06',
+  'theory-07': 'theory-07',
+  'theory-08': 'theory-08',
   'theory-09': 'theory-09',
   'theory-10': 'theory-10',
   'theory-11': 'theory-11',
@@ -273,12 +259,8 @@ export const THEORY_ID_MAP: Record<string, string> = {
 
 export const normalizeTheoryChapterId = (idOrSlug: string): string => {
   if (!idOrSlug) return 'theory-01';
-  if (THEORY_ID_MAP[idOrSlug]) return THEORY_ID_MAP[idOrSlug];
-  if (idOrSlug === 'theory-06') return 'delete-beginning';
-  if (idOrSlug === 'theory-07') return 'delete-end';
-  if (idOrSlug === 'theory-08') return 'delete-position';
   if (idOrSlug.startsWith('theory-')) return idOrSlug;
-  return idOrSlug;
+  return THEORY_ID_MAP[idOrSlug] || idOrSlug;
 };
 
 type ProgressListener = (state: UserProgressState) => void;
@@ -432,12 +414,9 @@ class ProgressManager {
       'fn-03-table': 'theory-03',
       'fn-04-lifecycle': 'theory-04',
       'fn-05-collision': 'theory-05',
-      'delete-beginning': 'delete-beginning',
-      'fn-06-chaining': 'delete-beginning',
-      'delete-end': 'delete-end',
-      'fn-07-linear': 'delete-end',
-      'delete-position': 'delete-position',
-      'fn-08-quadratic': 'delete-position',
+      'fn-06-chaining': 'theory-06',
+      'fn-07-linear': 'theory-07',
+      'fn-08-quadratic': 'theory-08',
       'fn-09-double': 'theory-09',
       'fn-10-realworld': 'theory-10',
       'fn-11-advantages': 'theory-11',
@@ -452,13 +431,13 @@ class ProgressManager {
       let progressPercent = this.state.moduleProgress[m.id] || 0;
       const chapterId = moduleMapping[m.id];
 
-      if (chapterId && (theoryDone.includes(chapterId) || (chapterId === 'delete-beginning' && theoryDone.includes('theory-06')) || (chapterId === 'delete-end' && theoryDone.includes('theory-07')) || (chapterId === 'delete-position' && theoryDone.includes('theory-08')))) {
+      if (chapterId && theoryDone.includes(chapterId)) {
         status = 'COMPLETED';
         progressPercent = 100;
       }
 
       // Also support game level masteries for interactive modules
-      if ((m.id === 'delete-beginning' || m.id === 'fn-06-chaining') && levelsDone.includes(2)) {
+      if (m.id === 'fn-06-chaining' && levelsDone.includes(2)) {
         status = this.state.levelsMastered.includes(2) ? 'MASTERED' : 'COMPLETED';
         progressPercent = 100;
       } else if (m.id === 'fn-07-linear' && levelsDone.includes(3)) {
@@ -561,12 +540,9 @@ class ProgressManager {
       'theory-03': 'fn-03-table',
       'theory-04': 'fn-04-lifecycle',
       'theory-05': 'fn-05-collision',
-      'delete-beginning': 'delete-beginning',
-      'theory-06': 'delete-beginning',
-      'delete-end': 'delete-end',
-      'theory-07': 'delete-end',
-      'delete-position': 'delete-position',
-      'theory-08': 'delete-position',
+      'theory-06': 'fn-06-chaining',
+      'theory-07': 'fn-07-linear',
+      'theory-08': 'fn-08-quadratic',
       'theory-09': 'fn-09-double',
       'theory-10': 'fn-10-realworld',
       'theory-11': 'fn-11-advantages',

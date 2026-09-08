@@ -1144,17 +1144,6 @@ export const TASK_STEP_BUILDERS: Record<
   ],
 };
 
-// Aliases for Deletion operations to match concept IDs
-if (TASK_STEP_BUILDERS['L2_T1']) {
-  TASK_STEP_BUILDERS['delete-beginning'] = TASK_STEP_BUILDERS['L2_T1'];
-}
-if (TASK_STEP_BUILDERS['L2_T2']) {
-  TASK_STEP_BUILDERS['delete-end'] = TASK_STEP_BUILDERS['L2_T2'];
-}
-if (TASK_STEP_BUILDERS['L4_T2']) {
-  TASK_STEP_BUILDERS['delete-position'] = TASK_STEP_BUILDERS['L4_T2'];
-}
-
 /**
  * Returns all step definitions for a task.
  */

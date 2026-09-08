@@ -1574,26 +1574,6 @@ export const SLL_TASKS: Record<string, SLLTaskDef> = {
   },
 };
 
-// Aliases for Deletion operations to match concept IDs
-if (SLL_TASKS['L2_T1']) {
-  SLL_TASKS['delete-beginning'] = {
-    ...SLL_TASKS['L2_T1'],
-    id: 'delete-beginning',
-  };
-}
-if (SLL_TASKS['L2_T2']) {
-  SLL_TASKS['delete-end'] = {
-    ...SLL_TASKS['L2_T2'],
-    id: 'delete-end',
-  };
-}
-if (SLL_TASKS['L4_T2']) {
-  SLL_TASKS['delete-position'] = {
-    ...SLL_TASKS['L4_T2'],
-    id: 'delete-position',
-  };
-}
-
 export const LEVEL_TASK_IDS: Record<number, string[]> = {
   1: ['L1_T1', 'L1_T2', 'L1_T3', 'L1_T4'],
   2: ['L2_T1', 'L2_T2', 'L2_T3', 'L2_T4'],
