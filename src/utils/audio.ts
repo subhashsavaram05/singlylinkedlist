@@ -1122,6 +1122,10 @@ class SoundEffectsController {
   }
 
   // 100% Curriculum Completion Celebration Fanfare
+  public playCelebrate() {
+    this.play100PercentFanfare();
+  }
+
   public play100PercentFanfare() {
     if (!this.initCtx()) return;
     try {

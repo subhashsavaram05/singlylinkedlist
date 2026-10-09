@@ -35,6 +35,7 @@ import { GameHintCard } from './components/GameHintCard';
 import { GameLevelGuide } from './components/GameLevelGuide';
 import { CompletionCelebrationModal } from './components/CompletionCelebrationModal';
 import { ResetProgressModal } from './components/ResetProgressModal';
+import { PointsView } from './components/PointsView';
 import { AIBotFloatingButton } from './components/AIBotFloatingButton';
 import { Sparkles } from 'lucide-react';
 import { progressManager } from './utils/progressManager';
@@ -178,9 +179,10 @@ export default function App() {
 
   // Subscribe to progress manager
   useEffect(() => {
-    const unsub = progressManager.subscribe((pState) => {
-      setCompletedLevels(pState.levelsCompleted);
-      setScore(pState.totalScore);
+    const unsub = progressManager.subscribe(() => {
+      const state = progressManager.getState();
+      setCompletedLevels(state.levelsCompleted);
+      setScore(state.totalScore);
     });
     return () => unsub();
   }, []);
@@ -713,6 +715,21 @@ export default function App() {
                     setActiveTab(tab as MainViewTab);
                   }
                 }}
+              />
+            )}
+
+            {/* 7. POINTS LEDGER & SCORE BREAKDOWN SECTION */}
+            {activeTab === 'POINTS' && (
+              <PointsView
+                onNavigateToTab={(tab: MainViewTab, chapterId?: string) => {
+                  if (tab === 'THEORY') {
+                    if (chapterId) setActiveTheoryTopic(chapterId);
+                    setActiveTab('THEORY');
+                  } else {
+                    setActiveTab(tab);
+                  }
+                }}
+                onResetProgress={() => setShowResetModal(true)}
               />
             )}
           </div>

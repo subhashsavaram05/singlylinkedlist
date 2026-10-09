@@ -54,6 +54,15 @@ interface SLLTaskPanelProps {
   } | null;
   onSearchAnswer?: (isMatch: boolean) => void;
   deletePosition?: number;
+  baseScore?: number;
+  scoreBreakdown?: {
+    baseScore: number;
+    hintPenalty: number;
+    guidePenalty: number;
+    finalScore: number;
+    hintUsed: boolean;
+    guideUsed: boolean;
+  } | null;
 }
 
 export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
@@ -85,6 +94,8 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
   searchStepPrompt,
   onSearchAnswer,
   deletePosition = 2,
+  baseScore,
+  scoreBreakdown,
 }) => {
   // Check target condition completion in real time for beginner feedback
   const target = task?.targetCondition || {};
@@ -109,7 +120,7 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
               Task #{task.taskIndex}
             </span>
             <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
-              +{task.xpReward} XP
+              +{baseScore || task.xpReward} XP
             </span>
           </div>
 
@@ -395,6 +406,34 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
               <span>NO (Advance Next)</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Completed Task Score Breakdown */}
+      {isCompleted && scoreBreakdown && (
+        <div className="p-4 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 text-emerald-900 dark:text-emerald-200 shadow-xs">
+          <div className="flex items-center gap-1.5 font-bold text-xs font-mono uppercase tracking-wider mb-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>TASK COMPLETED</span>
+          </div>
+          <div className="space-y-1.5 font-mono text-xs">
+            <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
+              <span>Base Score:</span>
+              <span className="font-bold">{scoreBreakdown.baseScore} XP</span>
+            </div>
+            <div className={`flex items-center justify-between ${scoreBreakdown.hintUsed ? 'text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-slate-400'}`}>
+              <span>Hint Penalty:</span>
+              <span className="font-bold">{scoreBreakdown.hintUsed ? '-2 XP' : '0 XP'}</span>
+            </div>
+            <div className={`flex items-center justify-between ${scoreBreakdown.guideUsed ? 'text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-slate-400'}`}>
+              <span>Guide & Solve Penalty:</span>
+              <span className="font-bold">{scoreBreakdown.guideUsed ? '-3 XP' : '0 XP'}</span>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-emerald-200 dark:border-emerald-700/50 text-emerald-900 dark:text-emerald-100 font-bold text-sm">
+              <span>Final Score:</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">+{scoreBreakdown.finalScore} XP</span>
+            </div>
           </div>
         </div>
       )}

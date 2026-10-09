@@ -66,6 +66,7 @@ interface SLLOperationGameScreenProps {
   onSelectTask?: (taskId: string) => void;
   totalScore: number;
   topicTitle?: string;
+  topicId?: 'insertion' | 'deletion' | 'traversal';
   taskTitleOverride?: string;
   taskNumberOverride?: number;
 }
@@ -78,6 +79,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   onSelectTask,
   totalScore,
   topicTitle,
+  topicId,
   taskTitleOverride,
   taskNumberOverride,
 }) => {
@@ -86,6 +88,19 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   const levelTaskIds = LEVEL_TASK_IDS[currentLevelId] || [];
   const currentTaskIndex = levelTaskIds.indexOf(taskId);
   const nextTaskId = currentTaskIndex >= 0 && currentTaskIndex < levelTaskIds.length - 1 ? levelTaskIds[currentTaskIndex + 1] : undefined;
+
+  const gameCategory: 'insertion' | 'deletion' | 'traversal' = useMemo(() => {
+    if (topicId) return topicId;
+    if (topicTitle?.toLowerCase().includes('insert') || activeTask.id.startsWith('L1') || activeTask.id === 'L4_T1') {
+      return 'insertion';
+    }
+    if (topicTitle?.toLowerCase().includes('delete') || activeTask.id.startsWith('L2') || activeTask.id === 'L4_T2') {
+      return 'deletion';
+    }
+    return 'traversal';
+  }, [topicId, topicTitle, activeTask.id]);
+
+  const baseScore = gameCategory === 'traversal' ? 10 : 15;
 
   // Assistance Mode: 'guide_solve' | 'play'
   const [assistanceMode, setAssistanceMode] = useState<AssistanceMode>('guide_solve');
@@ -506,16 +521,10 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
       setPointers((prev) => ({ ...prev, currentAddress: null }));
       setCompletedSteps([1, 2, 3, 4, 5]);
       setCurrentStep(5);
-      soundManager.play('celebrate');
-      setIsCompleted(true);
-      setTaskStatus('completed');
-      progressManager.addScore(activeTask.xpReward);
-      setFeedback({
-        type: 'success',
-        title: 'Traversal Completed! 🎉',
-        message: 'CURRENT reached NULL. All nodes visited in sequence: 10 → 20 → 30 → 40 → NULL.',
-        explanation: activeTask.conceptExplanation,
-      });
+      triggerTaskCompletion(
+        'Traversal Completed! 🎉',
+        'CURRENT reached NULL. All nodes visited in sequence: 10 → 20 → 30 → 40 → NULL.'
+      );
     } else {
       soundManager.play('error');
       setFeedback({
@@ -707,6 +716,11 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   // Assistance Mode switcher: GUIDE & SOLVE vs PLAY
   const handleSelectAssistanceMode = (mode: AssistanceMode) => {
     soundManager.play('click');
+    if (mode === 'guide_solve' || mode === 'guide') {
+      progressManager.recordGameTaskAssistance(taskId, 'guide');
+    } else if (mode === 'concept') {
+      progressManager.recordGameTaskAssistance(taskId, 'concept');
+    }
     if (mode === 'play') {
       const hasSeen = localStorage.getItem('sll_has_seen_how_to_play');
       if (!hasSeen) {
@@ -717,9 +731,56 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   };
 
   const handleOpenHint = () => {
-    // Penalty for hint: -5
-    progressManager.addScore(-5);
+    soundManager.play('click');
+    // Only records hint used (applied once during final score calculation)
+    progressManager.recordGameTaskAssistance(taskId, 'hint');
     setActiveModal('HINT');
+  };
+
+  const [scoreBreakdown, setScoreBreakdown] = useState<{
+    baseScore: number;
+    hintPenalty: number;
+    guidePenalty: number;
+    finalScore: number;
+    hintUsed: boolean;
+    guideUsed: boolean;
+  } | null>(null);
+
+  const triggerTaskCompletion = (customTitle?: string, customMessage?: string) => {
+    if (taskStatus === 'completed' || isCompleted) return;
+    setIsCompleted(true);
+    setTaskStatus('completed');
+    soundManager.play('celebrate');
+
+    const completion = progressManager.completeGameTask(taskId);
+    const scoreCalc = progressManager.calculateGameScore(gameCategory, taskId);
+
+    setScoreBreakdown({
+      baseScore: scoreCalc.baseScore,
+      hintPenalty: scoreCalc.hintPenalty,
+      guidePenalty: scoreCalc.guidePenalty,
+      finalScore: scoreCalc.finalScore,
+      hintUsed: scoreCalc.hintUsed,
+      guideUsed: scoreCalc.guideUsed,
+    });
+
+    const parts: string[] = [
+      `Base Score: ${scoreCalc.baseScore} XP`,
+      `Hint Penalty: ${scoreCalc.hintUsed ? '-2 XP' : '0 XP'}`,
+      `Guide & Solve Penalty: ${scoreCalc.guideUsed ? '-3 XP' : '0 XP'}`,
+      `Final Score: +${scoreCalc.finalScore} XP`,
+    ];
+
+    if (completion.alreadyCompleted) {
+      parts.push(`(Replay Practice: +0 XP — Already Completed)`);
+    }
+
+    setFeedback({
+      type: 'success',
+      title: customTitle || 'TASK COMPLETED! 🎉',
+      message: `${customMessage ? customMessage + ' • ' : ''}${parts.join(' • ')}`,
+      explanation: activeTask.conceptExplanation,
+    });
   };
 
   // Traversal Step Interaction (Adapter for direct input or buttons)
@@ -806,16 +867,10 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
 
       const isLastStep = stepJustFinished >= totalTaskSteps || step.isCompleted;
       if (isLastStep) {
-        setTaskStatus('completed');
-        setIsCompleted(true);
-        soundManager.play('celebrate');
-        progressManager.addScore(activeTask.xpReward);
-        setFeedback({
-          type: 'success',
-          title: 'TASK COMPLETE! 🎉',
-          message: 'All steps completed! You built the linked list correctly.',
-          explanation: activeTask.conceptExplanation,
-        });
+        triggerTaskCompletion(
+          'TASK COMPLETED! 🎉',
+          'All steps completed! You built the linked list correctly.'
+        );
       } else {
         const nextStepNum = stepJustFinished + 1;
         setCurrentStep(nextStepNum);
@@ -850,16 +905,10 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     const isLastStep = stepJustFinished >= totalTaskSteps || stepToExecute.isCompleted;
 
     if (isLastStep) {
-      setTaskStatus('completed');
-      setIsCompleted(true);
-      soundManager.play('celebrate');
-      progressManager.addScore(activeTask.xpReward);
-      setFeedback({
-        type: 'success',
-        title: 'TASK COMPLETE! 🎉',
-        message: result.feedbackMessage || 'All steps completed! You built the linked list correctly.',
-        explanation: activeTask.conceptExplanation,
-      });
+      triggerTaskCompletion(
+        'TASK COMPLETED! 🎉',
+        result.feedbackMessage || 'All steps completed! You built the linked list correctly.'
+      );
     } else {
       const nextStepNum = stepJustFinished + 1;
       setCurrentStep(nextStepNum);
@@ -879,14 +928,10 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     if (isMatchAnswer === actualMatch) {
       if (actualMatch) {
         setSearchResult('found');
-        setIsCompleted(true);
-        soundManager.play('success');
-        setFeedback({
-          type: 'success',
-          title: 'Target Element 40 Found! 🎯',
-          message: `Matched at Address ${currentSearchNode.address}! Search halts in O(k) steps.`,
-        });
-        progressManager.addScore(activeTask.xpReward);
+        triggerTaskCompletion(
+          'Target Element 40 Found! 🎯',
+          `Matched at Address ${currentSearchNode.address}! Search halts in O(k) steps.`
+        );
       } else {
         // Advance to next
         if (currentSearchNode.nextAddress !== null) {
@@ -913,20 +958,17 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
 
   // "CHECK ANSWER" Primary Validation
   const handleCheckAnswer = () => {
+    progressManager.incrementGameAttempt(gameCategory);
+    progressManager.incrementGameAttempt(taskId);
     setAttempts((prev) => prev + 1);
     const searchDone = isCompleted || searchResult === 'found';
     const result = validateTaskAnswer(activeTask, nodes, pointers, traversalOutput, searchDone, deletePosition);
 
-    setFeedback(result.feedback);
-
     if (result.isValid) {
-      soundManager.play('success');
-      setIsCompleted(true);
-      progressManager.addScore(activeTask.xpReward);
+      triggerTaskCompletion('CORRECT! Linked list verified.');
     } else {
       soundManager.play('error');
-      // Penalty for wrong attempt: -10
-      progressManager.addScore(-10);
+      setFeedback(result.feedback);
     }
   };
 
@@ -1346,6 +1388,8 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
               }
               onSearchAnswer={handleSearchAnswer}
               deletePosition={deletePosition}
+              baseScore={baseScore}
+              scoreBreakdown={scoreBreakdown}
             />
           </div>
         </div>

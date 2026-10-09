@@ -38,9 +38,17 @@ export const SingleLinkedListGame: React.FC<SingleLinkedListGameProps> = ({
     }
   });
 
-  const [totalScore, setTotalScore] = useState<number>(() => progressManager.getState().totalScore);
+  const [totalScore, setTotalScore] = useState<number>(() => progressManager.getTotalPoints());
   const [showTopicCompleteModal, setShowTopicCompleteModal] = useState<boolean>(false);
   const [completedTopicId, setCompletedTopicId] = useState<SLLTopicId | null>(null);
+
+  // Subscribe to progressManager for real-time live updates
+  useEffect(() => {
+    const unsub = progressManager.subscribe((state) => {
+      setTotalScore(state.totalPoints);
+    });
+    return () => unsub();
+  }, []);
 
   // Save completed tasks to local storage
   useEffect(() => {
@@ -153,6 +161,7 @@ export const SingleLinkedListGame: React.FC<SingleLinkedListGameProps> = ({
             onSelectTask={(id) => setActiveTaskId(id)}
             totalScore={totalScore}
             topicTitle={selectedTopic?.title}
+            topicId={selectedTopicId}
             taskTitleOverride={currentTopicTask?.title}
             taskNumberOverride={currentTopicTask?.taskNumber}
           />
@@ -163,7 +172,7 @@ export const SingleLinkedListGame: React.FC<SingleLinkedListGameProps> = ({
       {showTopicCompleteModal && completedTopicId && (
         <SLLTopicCompleteModal
           topicTitle={SLL_TOPICS[completedTopicId].title}
-          scoreAwarded={100}
+          scoreAwarded={progressManager.getGameTopicEarnedScore(completedTopicId)}
           hasNextTopic={Boolean(nextTopicId)}
           onNextTopic={() => {
             setShowTopicCompleteModal(false);

@@ -1,6 +1,34 @@
 export type TechniqueType = 'basic' | 'chaining' | 'linear' | 'quadratic' | 'double_hashing';
 
-export type MainViewTab = 'HOME' | 'THEORY' | 'VIDEO' | 'GAME' | 'QUEST' | 'LAB' | 'QUIZ' | 'PROGRESS';
+export type MainViewTab =
+  | 'HOME'
+  | 'THEORY'
+  | 'VIDEO'
+  | 'GAME'
+  | 'QUEST'
+  | 'LAB'
+  | 'QUIZ'
+  | 'PROGRESS'
+  | 'POINTS';
+
+export type SLLActivityCategory = 'learn' | 'visualize' | 'game' | 'quiz';
+
+export interface ActivityRecord {
+  id: string;
+  category: SLLActivityCategory;
+  pointsAwarded: number;
+  maxPoints: number;
+  completedAt: number;
+  metadata?: {
+    hintUsed?: boolean;
+    guideUsed?: boolean;
+    baseScore?: number;
+    penalty?: number;
+    finalScore?: number;
+    attempts?: number;
+    [key: string]: any;
+  };
+}
 
 export interface VideoChapter {
   title: string;
@@ -109,7 +137,6 @@ export interface UserProgressState {
   quizScores: Record<number, number>; // questionId -> chosen answer
   quizSubmitted: boolean;
   quizFinalScore: number;
-  masterChallengesCompleted: string[];
   sandboxOperationsCount: number;
   totalScore: number;
   streak: number;

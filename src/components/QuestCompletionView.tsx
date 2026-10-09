@@ -64,7 +64,7 @@ export const QuestCompletionView: React.FC<QuestCompletionViewProps> = ({
     {
       id: 5,
       code: '05',
-      title: 'Master Challenge',
+      title: 'Synthesis Lab',
       desc: 'Comprehensive 7-step sequence executing create, insert, delete, search, and traverse.',
       tag: 'DATA STRUCTURE MASTERY',
     },

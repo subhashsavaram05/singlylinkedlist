@@ -14,7 +14,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: 'msg-welcome',
     sender: 'assistant',
-    text: "Hello! I'm your AlgoLearn AI Teaching Assistant. I'm here to help you master Singly Linked Lists, Hash Tables, collision resolutions, time complexities, and interactive algorithm challenges. What would you like to explore or need help with?",
+    text: "Hello! I'm your AlgoLearn AI Teaching Assistant. I'm here to help you master Singly Linked Lists, Hash Tables, collision resolutions, time complexities, and interactive algorithm modules. What would you like to explore or need help with?",
     timestamp: 'Just now',
   },
 ];

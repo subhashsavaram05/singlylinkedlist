@@ -47,9 +47,9 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
     });
   }, [video1Src, video2Src]);
 
-  // Default to Lesson 01 so the player is ready immediately
+  // Default to visualizer so interactive 15-point visualization activities are immediately accessible
   const [selectedLesson, setSelectedLesson] = useState<LessonItem | null>(() => lessons[0] || null);
-  const [activePlayerMode, setActivePlayerMode] = useState<'video' | 'visualizer'>('video');
+  const [activePlayerMode, setActivePlayerMode] = useState<'video' | 'visualizer'>('visualizer');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);

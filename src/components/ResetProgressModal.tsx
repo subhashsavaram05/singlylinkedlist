@@ -44,27 +44,24 @@ export const ResetProgressModal: React.FC<ResetProgressModalProps> = ({
 
         {/* Body Description */}
         <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6 font-normal">
-          Are you sure you want to reset your learning progress?
-          <br className="hidden sm:inline" /> All completed theory chapters,
-          watched videos, completed game levels, quiz progress, and
-          mastery progress will be reset.
+          Are you sure you want to reset all learning progress?
         </p>
 
-        {/* Action Buttons: [ EXIT ] [ RESET ] */}
+        {/* Action Buttons: [ Cancel ] [ Reset Progress ] */}
         <div className="grid grid-cols-2 gap-3 pt-2">
-          {/* EXIT Button */}
+          {/* Cancel Button */}
           <button
-            id="btn-modal-exit-reset"
+            id="btn-modal-cancel-reset"
             onClick={() => {
               soundManager.playModalClose();
               onClose();
             }}
-            className="py-3 px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer active:scale-95 shadow-xs"
+            className="py-3 px-4 rounded-xl text-xs sm:text-sm font-bold tracking-wider bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer active:scale-95 shadow-xs"
           >
-            EXIT
+            Cancel
           </button>
 
-          {/* RESET Button */}
+          {/* Reset Progress Button */}
           <button
             id="btn-modal-confirm-reset"
             onClick={() => {
@@ -72,10 +69,10 @@ export const ResetProgressModal: React.FC<ResetProgressModalProps> = ({
               onConfirm();
               onClose();
             }}
-            className="py-3 px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/30 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2"
+            className="py-3 px-4 rounded-xl text-xs sm:text-sm font-bold tracking-wider bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/30 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-2"
           >
             <RotateCcw className="w-4 h-4" />
-            <span>RESET</span>
+            <span>Reset Progress</span>
           </button>
         </div>
       </div>

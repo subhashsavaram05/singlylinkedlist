@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { SLLTopicId, SLL_TOPICS } from '../../data/sllTopics';
 import { soundManager } from '../../utils/audio';
+import { progressManager } from '../../utils/progressManager';
 
 interface SLLTopicScreenProps {
   topicId: SLLTopicId;
@@ -101,7 +102,9 @@ export const SLLTopicScreen: React.FC<SLLTopicScreenProps> = ({
         {/* Tasks Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
           {topic.tasks.map((task) => {
-            const isDone = completedTasks.includes(task.id);
+            const taskState = progressManager.getGameTaskState(task.id);
+            const isDone = taskState.completed || completedTasks.includes(task.id) || progressManager.isCompleted(task.id);
+            const earnedFinalScore = taskState.completed ? taskState.finalScore : task.xpReward;
 
             return (
               <motion.div
@@ -124,9 +127,9 @@ export const SLLTopicScreen: React.FC<SLLTopicScreenProps> = ({
 
                     {/* Completion or XP Pill */}
                     {isDone ? (
-                      <span className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#2563EB] dark:text-blue-300 bg-[#EFF6FF] dark:bg-blue-950/80 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800/40">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
-                        <span>Done</span>
+                      <span className="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/40">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>+{earnedFinalScore} XP</span>
                       </span>
                     ) : (
                       <span className="text-xs font-mono font-bold text-[#2563EB] dark:text-blue-300 bg-[#EFF6FF] dark:bg-blue-950/60 px-2.5 py-1 rounded-full border border-blue-200/70 dark:border-blue-900/40">

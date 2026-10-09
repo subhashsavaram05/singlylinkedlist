@@ -18,7 +18,7 @@ import {
   Code2,
 } from 'lucide-react';
 import { TechniqueType } from '../types/game';
-import { progressManager, normalizeTheoryChapterId, TOTAL_CONCEPTS } from '../utils/progressManager';
+import { progressManager, normalizeTheoryChapterId, TOTAL_CONCEPTS, LEARN_ACTIVITIES } from '../utils/progressManager';
 import { soundManager } from '../utils/audio';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { TheoryVisualEnhancer } from './TheoryVisualEnhancer';
@@ -1595,8 +1595,8 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
   }, [initialTopic]);
 
   useEffect(() => {
-    const unsub = progressManager.subscribe((state) => {
-      setPState(state);
+    const unsub = progressManager.subscribe(() => {
+      setPState(progressManager.getState());
     });
     return () => unsub();
   }, []);
@@ -1622,23 +1622,20 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
     progressManager.setCurrentTheoryChapter(normalized);
   };
 
+  const currentActivity = LEARN_ACTIVITIES.find((l) => l.theoryChapterId === activeChapter.id);
+  const currentChapterPoints = currentActivity ? currentActivity.points : 2;
+  const learnScore = progressManager.getCategoryScore('learn');
+
   const handleMarkCompleted = () => {
     if (isCurrentChapterCompleted) return;
-    const newlyCompleted = progressManager.completeTheoryChapter(activeChapter.id);
-    if (newlyCompleted) {
+    const result = progressManager.completeLearnByChapterId(activeChapter.id);
+    if (result.newlyCompleted) {
       soundManager.playTheoryComplete();
     }
   };
 
   const handleNextChapter = () => {
     soundManager.playNav();
-    if (!isCurrentChapterCompleted) {
-      const newlyCompleted = progressManager.completeTheoryChapter(activeChapter.id);
-      if (newlyCompleted) {
-        soundManager.playTheoryComplete();
-      }
-    }
-
     if (activeChapterIndex < THEORY_CHAPTERS.length - 1) {
       const nextChapter = THEORY_CHAPTERS[activeChapterIndex + 1];
       setActiveChapterId(nextChapter.id);
@@ -1670,8 +1667,10 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
               Data Structures & Linked Lists
             </span>
           </div>
-          <div className="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-[#080D1F] px-3 py-1 rounded-lg border border-slate-200 dark:border-blue-900/25">
-            Progress: <span className="text-blue-600 dark:text-blue-400 font-bold">{totalCompletedCount}</span> / {TOTAL_CONCEPTS} Concepts ({theoryPercentage}%)
+          <div className="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-[#080D1F] px-3 py-1 rounded-lg border border-slate-200 dark:border-blue-900/25 flex items-center gap-2">
+            <span>Learn Score:</span>
+            <span className="text-blue-600 dark:text-blue-400 font-bold">{learnScore} / 25 Pts</span>
+            <span className="text-slate-400">({totalCompletedCount}/15 Completed)</span>
           </div>
         </div>
 
@@ -1734,19 +1733,15 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {isCompleted ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold text-xs" title="Completed">
-                        ✓
-                      </span>
-                    ) : isSelected ? (
-                      <span className="text-blue-600 dark:text-blue-400 text-xs font-bold" title="Current">
-                        ●
-                      </span>
-                    ) : (
-                      <span className="text-slate-300 dark:text-slate-600 text-xs font-normal" title="Available">
-                        ○
-                      </span>
-                    )}
+                    <span
+                      className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                        isCompleted
+                          ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      {isCompleted ? `✓ +${LEARN_ACTIVITIES.find((l) => l.theoryChapterId === chap.id)?.points || 1}` : `${LEARN_ACTIVITIES.find((l) => l.theoryChapterId === chap.id)?.points || 1} pt`}
+                    </span>
                   </div>
                 </button>
               );
@@ -2170,7 +2165,7 @@ export const LearnHashingSection: React.FC<LearnHashingSectionProps> = ({
                       : 'text-white'
                   }`}
                 />
-                <span>{isCurrentChapterCompleted ? 'Completed' : 'Mark Completed'}</span>
+                <span>{isCurrentChapterCompleted ? `✓ Completed (+${currentChapterPoints} pts)` : `Complete Activity (+${currentChapterPoints} pts)`}</span>
               </button>
 
               {/* Next Button */}

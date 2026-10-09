@@ -25,7 +25,7 @@ export const LevelProgressBar: React.FC<LevelProgressBarProps> = ({
     { id: 2, code: '02', name: 'Delete Nodes' },
     { id: 3, code: '03', name: 'Traverse' },
     { id: 4, code: '04', name: 'Search' },
-    { id: 5, code: '05', name: 'Master Challenge' },
+    { id: 5, code: '05', name: 'Synthesis Lab' },
   ];
 
   const isAllQuestCompleted = [1, 2, 3, 4, 5].every(
