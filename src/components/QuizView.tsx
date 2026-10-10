@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   CheckCircle2,
   XCircle,
   HelpCircle,
   Award,
-  RotateCcw,
   Sparkles,
   ArrowRight,
   ArrowLeft,
@@ -18,6 +17,9 @@ import {
   ListOrdered,
   Trophy,
   Home,
+  Play,
+  RotateCcw,
+  Clock,
 } from 'lucide-react';
 import { progressManager } from '../utils/progressManager';
 import { soundManager } from '../utils/audio';
@@ -50,6 +52,8 @@ export interface StudentAnswerRecord {
   correctOptionIndex: number;
   correctAnswerText: string;
   isCorrect: boolean;
+  isTimeout?: boolean;
+  points?: number;
 }
 
 export const QUIZ_QUESTIONS: QuizQuestion[] = [
@@ -231,9 +235,6 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   },
 ];
 
-const QUIZ_STORAGE_ANSWERS_KEY = 'sll_quiz_answers_v1';
-const QUIZ_STORAGE_SUBMITTED_KEY = 'sll_quiz_submitted_v1';
-
 export const QuizView: React.FC<QuizViewProps> = ({
   onNavigateToTheory,
   onNavigateToQuest,
@@ -242,58 +243,240 @@ export const QuizView: React.FC<QuizViewProps> = ({
 }) => {
   useScrollReveal();
 
-  // Load persisted student answers
-  const [studentAnswers, setStudentAnswers] = useState<Record<number, StudentAnswerRecord>>(() => {
-    try {
-      const stored = localStorage.getItem(QUIZ_STORAGE_ANSWERS_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // fallback
-    }
-    return {};
+  // Quiz active state: restore from progressManager so navigating away does not restart from first
+  const [hasStarted, setHasStarted] = useState<boolean>(() => {
+    const session = progressManager.getQuizSession();
+    const recordedQuestions = progressManager.getAllQuizQuestions();
+    const hasAnyRecorded = Object.keys(recordedQuestions).length > 0;
+    return !!session.hasStarted || hasAnyRecorded;
   });
 
   const [isSubmitted, setIsSubmitted] = useState<boolean>(() => {
-    try {
-      const storedSub = localStorage.getItem(QUIZ_STORAGE_SUBMITTED_KEY);
-      if (storedSub !== null) {
-        return storedSub === 'true';
-      }
-      return progressManager.getState().quizSubmitted || false;
-    } catch {
-      return false;
-    }
+    const session = progressManager.getQuizSession();
+    const central = progressManager.getCentralState();
+    return !!session.isSubmitted || !!central.quizSubmitted;
   });
 
-  // Subscribe to progressManager for reset synchronization
-  useEffect(() => {
-    const unsub = progressManager.subscribe((pState) => {
-      if (!pState.quizSubmitted) {
-        setIsSubmitted(false);
-        try {
-          const stored = localStorage.getItem(QUIZ_STORAGE_ANSWERS_KEY);
-          if (!stored) {
-            setStudentAnswers({});
-          }
-        } catch {
-          // Ignore
+  const [studentAnswers, setStudentAnswers] = useState<Record<number, StudentAnswerRecord>>(() => {
+    const session = progressManager.getQuizSession();
+    const answers: Record<number, StudentAnswerRecord> = { ...(session.studentAnswers || {}) };
+
+    // Reconstruct / sync from progressManager recorded questions
+    const recordedQuestions = progressManager.getAllQuizQuestions();
+    Object.entries(recordedQuestions).forEach(([qIdStr, rec]) => {
+      const qId = Number(qIdStr);
+      if (!answers[qId] && rec.status !== 'unanswered') {
+        const qDef = QUIZ_QUESTIONS.find((item) => item.id === qId);
+        if (qDef) {
+          const isTimeout = rec.status === 'timeout' || rec.selectedOptionIndex === -1;
+          const isCorrect = rec.status === 'correct';
+          const selIdx = rec.selectedOptionIndex !== undefined ? rec.selectedOptionIndex : -1;
+          answers[qId] = {
+            questionId: qId,
+            selectedOptionIndex: selIdx,
+            selectedAnswerText: selIdx >= 0 && qDef.options[selIdx] ? qDef.options[selIdx] : 'Unanswered / Timed out',
+            correctOptionIndex: qDef.correctIndex,
+            correctAnswerText: qDef.correctAnswerText,
+            isCorrect,
+            isTimeout,
+            points: rec.points,
+          };
         }
       }
+    });
+
+    return answers;
+  });
+
+  // Navigation within Quiz (0-indexed current question) - restore last visited question
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(() => {
+    const session = progressManager.getQuizSession();
+    if (
+      typeof session.currentQuestionIndex === 'number' &&
+      session.currentQuestionIndex >= 0 &&
+      session.currentQuestionIndex < QUIZ_QUESTIONS.length
+    ) {
+      return session.currentQuestionIndex;
+    }
+    return 0;
+  });
+
+  // 20-second independent countdown timer for each question
+  const [timeLeft, setTimeLeft] = useState<number>(() => {
+    const session = progressManager.getQuizSession();
+    if (typeof session.timeLeft === 'number' && session.timeLeft > 0 && session.timeLeft <= 20) {
+      return session.timeLeft;
+    }
+    return 20;
+  });
+
+  const [currentQuizScore, setCurrentQuizScore] = useState<number>(() =>
+    progressManager.getCategoryScore('quiz')
+  );
+
+  // Subscribe to progressManager for real-time live score updates
+  useEffect(() => {
+    const unsub = progressManager.subscribe(() => {
+      setCurrentQuizScore(progressManager.getCategoryScore('quiz'));
     });
     return unsub;
   }, []);
 
-  // Navigation within Quiz (0-indexed current question)
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
-  // Temporary selection before confirming/submitting the question
   const [pendingSelection, setPendingSelection] = useState<number | null>(null);
+
+  // Helper to change question and persist session index
+  const navigateToQuestion = useCallback((newIndex: number) => {
+    if (newIndex < 0 || newIndex >= QUIZ_QUESTIONS.length) return;
+    setCurrentQuestionIndex(newIndex);
+    const targetQ = QUIZ_QUESTIONS[newIndex];
+    const isAnswered = studentAnswers[targetQ?.id] !== undefined;
+    if (!isAnswered) {
+      setTimeLeft(20);
+    }
+    progressManager.saveQuizSession({
+      hasStarted: true,
+      currentQuestionIndex: newIndex,
+      timeLeft: isAnswered ? 20 : 20,
+    });
+  }, [studentAnswers]);
+
+  // Save session when unmounting / navigating away to another section
+  useEffect(() => {
+    return () => {
+      if (hasStarted) {
+        progressManager.saveQuizSession({
+          hasStarted,
+          currentQuestionIndex,
+          timeLeft,
+          isSubmitted,
+          studentAnswers,
+        });
+      }
+    };
+  }, [hasStarted, currentQuestionIndex, timeLeft, isSubmitted, studentAnswers]);
 
   // Current question helper
   const currentQuestion = QUIZ_QUESTIONS[currentQuestionIndex] || QUIZ_QUESTIONS[0];
   const currentAnswerRecord = studentAnswers[currentQuestion.id];
   const isCurrentQuestionAnswered = currentAnswerRecord !== undefined;
+
+  // Complete & finalize the examination
+  const finishQuiz = useCallback((finalAnswers: Record<number, StudentAnswerRecord>) => {
+    setIsSubmitted(true);
+
+    let calculatedCorrect = 0;
+    QUIZ_QUESTIONS.forEach((q) => {
+      const rec = finalAnswers[q.id];
+      if (rec && rec.isCorrect) calculatedCorrect++;
+    });
+
+    const rawScoresMap: Record<number, number> = {};
+    (Object.values(finalAnswers) as StudentAnswerRecord[]).forEach((rec) => {
+      rawScoresMap[rec.questionId] = rec.selectedOptionIndex;
+    });
+
+    progressManager.recordQuizCompletion(rawScoresMap, calculatedCorrect, QUIZ_QUESTIONS.length);
+    progressManager.saveQuizSession({
+      hasStarted: true,
+      isSubmitted: true,
+      studentAnswers: finalAnswers,
+      currentQuestionIndex,
+    });
+
+    if (calculatedCorrect >= 6) {
+      soundManager.playQuizComplete();
+    } else {
+      soundManager.playQuizWrong();
+    }
+  }, [currentQuestionIndex]);
+
+  // Automatic timeout handler when 20 seconds expire
+  const handleTimeout = useCallback(() => {
+    const q = QUIZ_QUESTIONS[currentQuestionIndex];
+    if (!q || studentAnswers[q.id] !== undefined) return;
+
+    soundManager.playError();
+
+    const newRecord: StudentAnswerRecord = {
+      questionId: q.id,
+      selectedOptionIndex: -1,
+      selectedAnswerText: 'Unanswered / Timed out',
+      correctOptionIndex: q.correctIndex,
+      correctAnswerText: q.correctAnswerText,
+      isCorrect: false,
+      isTimeout: true,
+      points: 0,
+    };
+
+    const updatedAnswers = {
+      ...studentAnswers,
+      [q.id]: newRecord,
+    };
+    setStudentAnswers(updatedAnswers);
+
+    // Record internally as timeout (awards exactly 0 points)
+    progressManager.recordQuizQuestion(q.id, 'timeout', -1);
+
+    // Automatically proceed to next question if one remains, or finish quiz if final question
+    if (currentQuestionIndex < QUIZ_QUESTIONS.length - 1) {
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(nextIndex);
+      setTimeLeft(20);
+      progressManager.saveQuizSession({
+        hasStarted: true,
+        currentQuestionIndex: nextIndex,
+        timeLeft: 20,
+        studentAnswers: updatedAnswers,
+      });
+    } else {
+      finishQuiz(updatedAnswers);
+    }
+  }, [currentQuestionIndex, studentAnswers, finishQuiz]);
+
+  // Start quiz action
+  const handleStartQuiz = () => {
+    soundManager.playClick();
+    setHasStarted(true);
+    setCurrentQuestionIndex(0);
+    setTimeLeft(20);
+    progressManager.saveQuizSession({
+      hasStarted: true,
+      currentQuestionIndex: 0,
+      timeLeft: 20,
+      isSubmitted: false,
+      studentAnswers: {},
+    });
+  };
+
+  // Retake quiz action
+  const handleRetakeQuiz = () => {
+    soundManager.playNav();
+    setHasStarted(false);
+    setIsSubmitted(false);
+    setStudentAnswers({});
+    setCurrentQuestionIndex(0);
+    setPendingSelection(null);
+    setTimeLeft(20);
+    progressManager.resetQuizSession();
+  };
+
+  // Timer countdown effect: 20 seconds for each question once quiz starts
+  useEffect(() => {
+    if (!hasStarted || isSubmitted || isCurrentQuestionAnswered) {
+      return;
+    }
+
+    if (timeLeft <= 0) {
+      handleTimeout();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [hasStarted, isSubmitted, isCurrentQuestionAnswered, timeLeft, handleTimeout]);
 
   // Synchronize selection with current question record
   useEffect(() => {
@@ -304,44 +487,47 @@ export const QuizView: React.FC<QuizViewProps> = ({
     }
   }, [currentQuestionIndex, currentAnswerRecord]);
 
-  // Persist answers to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem(QUIZ_STORAGE_ANSWERS_KEY, JSON.stringify(studentAnswers));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [studentAnswers]);
-
-  // Calculate score deterministically from stored answers
-  const { score, totalQuestions, percentage } = useMemo(() => {
+  // Calculate score stats
+  const { score, wrongCount, unansweredCount, totalQuestions, percentage } = useMemo(() => {
     let correct = 0;
+    let wrong = 0;
+    let unanswered = 0;
+
     QUIZ_QUESTIONS.forEach((q) => {
       const rec = studentAnswers[q.id];
-      if (rec && rec.isCorrect) {
-        correct++;
+      if (rec) {
+        if (rec.isCorrect) {
+          correct++;
+        } else if (rec.isTimeout || rec.selectedOptionIndex < 0) {
+          unanswered++;
+        } else {
+          wrong++;
+        }
       }
     });
+
     const total = QUIZ_QUESTIONS.length;
     const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
     return {
       score: correct,
+      wrongCount: wrong,
+      unansweredCount: unanswered,
       totalQuestions: total,
       percentage: pct,
       correctAnswersCount: correct,
     };
   }, [studentAnswers]);
 
-  // Handle student selecting an option (before or during answering)
+  // Handle student selecting an option (disabled before Start Quiz)
   const handleSelectOption = (optionIndex: number) => {
-    if (isCurrentQuestionAnswered && isSubmitted) return;
+    if (!hasStarted || isCurrentQuestionAnswered) return;
     soundManager.playQuizSelect();
     setPendingSelection(optionIndex);
   };
 
-  // Handle confirming answer for current question (Records answer without revealing final result screen)
+  // Handle confirming answer with IMMEDIATE evaluation and point update (+3 or -1)
   const handleConfirmAnswer = () => {
-    if (pendingSelection === null || isCurrentQuestionAnswered) return;
+    if (!hasStarted || pendingSelection === null || isCurrentQuestionAnswered) return;
 
     const q = currentQuestion;
     const isCorrect = pendingSelection === q.correctIndex;
@@ -354,6 +540,8 @@ export const QuizView: React.FC<QuizViewProps> = ({
       correctOptionIndex: q.correctIndex,
       correctAnswerText: q.correctAnswerText,
       isCorrect,
+      isTimeout: false,
+      points: isCorrect ? 3 : -1,
     };
 
     const updatedAnswers = {
@@ -363,7 +551,17 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
     setStudentAnswers(updatedAnswers);
 
-    // Play appropriate interaction sound
+    // Immediately award (+3) or deduct (-1) points
+    progressManager.recordQuizQuestion(q.id, isCorrect ? 'correct' : 'wrong', pendingSelection);
+
+    // Persist session immediately so tab navigation preserves state
+    progressManager.saveQuizSession({
+      hasStarted: true,
+      currentQuestionIndex,
+      timeLeft,
+      studentAnswers: updatedAnswers,
+    });
+
     if (isCorrect) {
       soundManager.playQuizCorrect();
     } else {
@@ -371,9 +569,8 @@ export const QuizView: React.FC<QuizViewProps> = ({
     }
   };
 
-  // Handle submitting the entire examination ONLY when user clicks "Complete & Review"
+  // Handle submitting the entire examination when review is ready
   const handleSubmitExamination = () => {
-    // If pending selection on current question is not saved yet, save it
     const updatedAnswers = { ...studentAnswers };
     if (pendingSelection !== null && !updatedAnswers[currentQuestion.id]) {
       const q = currentQuestion;
@@ -386,66 +583,15 @@ export const QuizView: React.FC<QuizViewProps> = ({
         correctOptionIndex: q.correctIndex,
         correctAnswerText: q.correctAnswerText,
         isCorrect,
+        isTimeout: false,
+        points: isCorrect ? 3 : -1,
       };
       updatedAnswers[q.id] = newRecord;
       setStudentAnswers(updatedAnswers);
+      progressManager.recordQuizQuestion(q.id, isCorrect ? 'correct' : 'wrong', pendingSelection);
     }
 
-    const totalAnswered = Object.keys(updatedAnswers).length;
-    if (totalAnswered < QUIZ_QUESTIONS.length) {
-      soundManager.playError();
-      const firstUnansweredIndex = QUIZ_QUESTIONS.findIndex((quest) => updatedAnswers[quest.id] === undefined);
-      if (firstUnansweredIndex >= 0) {
-        setCurrentQuestionIndex(firstUnansweredIndex);
-      }
-      return;
-    }
-
-    setIsSubmitted(true);
-    try {
-      localStorage.setItem(QUIZ_STORAGE_SUBMITTED_KEY, 'true');
-    } catch {
-      // Ignore storage errors
-    }
-
-    // Calculate final correct score
-    let calculatedCorrect = 0;
-    QUIZ_QUESTIONS.forEach((q) => {
-      const rec = updatedAnswers[q.id];
-      if (rec && rec.isCorrect) calculatedCorrect++;
-    });
-
-    // Synchronize with progressManager
-    const rawScoresMap: Record<number, number> = {};
-    (Object.values(updatedAnswers) as StudentAnswerRecord[]).forEach((rec) => {
-      rawScoresMap[rec.questionId] = rec.selectedOptionIndex;
-    });
-
-    progressManager.recordQuizCompletion(rawScoresMap, calculatedCorrect, QUIZ_QUESTIONS.length);
-
-    if (calculatedCorrect >= 6) {
-      soundManager.playQuizComplete();
-    } else {
-      soundManager.playQuizWrong();
-    }
-  };
-
-  // Handle resetting the quiz completely
-  const handleResetQuiz = () => {
-    soundManager.playReset();
-    setStudentAnswers({});
-    setIsSubmitted(false);
-    setCurrentQuestionIndex(0);
-    setPendingSelection(null);
-
-    try {
-      localStorage.removeItem(QUIZ_STORAGE_ANSWERS_KEY);
-      localStorage.setItem(QUIZ_STORAGE_SUBMITTED_KEY, 'false');
-    } catch {
-      // Ignore
-    }
-
-    progressManager.resetQuizAttempt();
+    finishQuiz(updatedAnswers);
   };
 
   const getPerformanceFeedback = (score: number) => {
@@ -476,11 +622,9 @@ export const QuizView: React.FC<QuizViewProps> = ({
   const answeredCount = Object.keys(studentAnswers).length;
   const feedback = getPerformanceFeedback(score);
 
-  // Dynamic certificate/completion card theme determined by final quiz percentage
   const certificateTheme = useMemo(() => {
     if (percentage >= 80) {
       return {
-        // Grade A — Green Theme (80% – 100%)
         cardBorder: 'border-2 border-emerald-500/40 dark:border-emerald-500/40 shadow-emerald-500/5 dark:shadow-[0_8px_30px_rgba(16,185,129,0.15)]',
         trophyBg: 'bg-[#00A86B] dark:bg-emerald-600 shadow-emerald-500/20 dark:shadow-emerald-950/50',
         badge: 'border border-[#00A86B]/40 dark:border-emerald-500/40 bg-[#E6F8F0] dark:bg-emerald-950/60 text-[#008A54] dark:text-emerald-300',
@@ -492,7 +636,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
       };
     } else if (percentage >= 40) {
       return {
-        // Grade B — Light Blue Theme (40% – 79%)
         cardBorder: 'border-2 border-sky-400/50 dark:border-sky-500/40 shadow-sky-500/5 dark:shadow-[0_8px_30px_rgba(14,165,233,0.15)]',
         trophyBg: 'bg-sky-500 dark:bg-sky-600 shadow-sky-500/20 dark:shadow-sky-950/50',
         badge: 'border border-sky-400/50 dark:border-sky-500/40 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300',
@@ -504,7 +647,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
       };
     } else {
       return {
-        // Grade C — Yellow Theme (0% – 39%)
         cardBorder: 'border-2 border-amber-400/50 dark:border-amber-500/40 shadow-amber-500/5 dark:shadow-[0_8px_30px_rgba(245,158,11,0.15)]',
         trophyBg: 'bg-amber-500 dark:bg-amber-600 shadow-amber-500/20 dark:shadow-amber-950/50',
         badge: 'border border-amber-400/50 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300',
@@ -519,154 +661,173 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto py-4 px-4 font-sans text-slate-900 dark:text-white animate-page-enter">
-      {/* Header Banner */}
-      <div className="border border-slate-200 dark:border-blue-900/30 rounded-2xl pb-6 mb-6 bg-white dark:bg-[#0B1228] p-6 sm:p-8 shadow-xs dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] reveal-on-scroll">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#EFF6FF] dark:bg-blue-950/60 border border-[#BFDBFE] dark:border-blue-500/30 text-[#2563EB] dark:text-blue-300 rounded-lg text-xs font-semibold uppercase tracking-wider font-mono">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
-            <span>KNOWLEDGE ASSESSMENT</span>
+      {/* =========================================================================
+          1. QUIZ HEADER
+         ========================================================================= */}
+      <div className="bg-white dark:bg-[#0B1228] border border-slate-200/90 dark:border-blue-900/30 rounded-2xl p-4 sm:p-5 mb-5 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/80 dark:border-emerald-800/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+            <HelpCircle className="w-6 h-6" />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Single Linked List Quiz (10 Questions)
-            </span>
-            {isSubmitted && (
-              <span className="px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-md text-xs font-semibold">
-                Completed
-              </span>
-            )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              Quiz Assessment
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Validate your algorithmic Single Linked List reasoning and earn mastery points (Basic to Hard).
+            </p>
           </div>
         </div>
 
-        <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight animate-heading-enter">
-          Single Linked List Knowledge Check
-        </h1>
-        <p className="text-sm text-slate-600 dark:text-slate-300 max-w-2xl mt-1 leading-relaxed">
-          Test your understanding of nodes, pointers, traversal, insertion, deletion, searching, and the basic operations of a single linked list.
-        </p>
+        <div className="px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 text-xs sm:text-sm font-sans font-medium text-slate-700 dark:text-slate-300">
+          Question {currentQuestionIndex + 1} of {totalQuestions}
+        </div>
+      </div>
 
-        {/* Question Index Tabs / Progress Tracker */}
-        <div className="mt-5 pt-4 border-t border-slate-100 dark:border-blue-900/20">
-          <div className="flex items-center justify-between gap-2 mb-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
-              <span>
-                Progress: <strong className="text-[#2563EB] dark:text-blue-300 font-mono">{answeredCount}</strong> / {totalQuestions} Answered
-              </span>
-            </div>
-            {isSubmitted && (
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
-                {score} / {totalQuestions} Correct
-              </span>
-            )}
+      {/* =========================================================================
+          2. QUIZ SCORING RULES PANEL (NO TIMER INDICATOR)
+         ========================================================================= */}
+      <div
+        id="quiz-scoring-rules-panel"
+        className="p-4 sm:p-5 rounded-2xl bg-[#EFF6FF] dark:bg-blue-950/20 border border-[#BFDBFE] dark:border-blue-800/40 shadow-xs mb-5 font-sans"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]" />
+            <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#1E3A8A] dark:text-blue-300">
+              QUIZ SCORING RULES
+            </span>
           </div>
-
-          {/* Question Index Pills */}
-          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-            {QUIZ_QUESTIONS.map((q, idx) => {
-              const rec = studentAnswers[q.id];
-              const isAnswered = rec !== undefined;
-              const isCurrent = currentQuestionIndex === idx && !isSubmitted;
-
-              let pillStyle = 'bg-slate-50 dark:bg-[#080D1F] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-blue-900/30 hover:bg-slate-100 dark:hover:bg-[#0F1733]';
-              if (isCurrent) {
-                pillStyle = 'bg-[#2563EB] dark:bg-blue-600 text-white border-[#2563EB] dark:border-blue-500 font-bold shadow-xs dark:shadow-[0_0_12px_rgba(37,99,235,0.4)]';
-              } else if (isAnswered) {
-                if (rec.isCorrect) {
-                  pillStyle = 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 font-semibold';
-                } else {
-                  pillStyle = 'bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 font-semibold';
-                }
-              }
-
-              return (
-                <button
-                  key={q.id}
-                  id={`btn-quiz-jump-${q.id}`}
-                  onClick={() => {
-                    soundManager.playNav();
-                    if (isSubmitted) {
-                      const el = document.getElementById(`quiz-review-card-${q.id}`);
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }
-                    } else {
-                      setCurrentQuestionIndex(idx);
-                    }
-                  }}
-                  className={`py-2 text-center text-xs font-mono rounded-lg border transition-all cursor-pointer ${pillStyle}`}
-                  title={`Question ${idx + 1}`}
-                >
-                  <span>Q{idx + 1}</span>
-                  {isAnswered && (
-                    <span className="block text-[10px] leading-tight mt-0.5">
-                      {rec.isCorrect ? '✓' : '✕'}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <span className="text-xs font-mono font-bold px-3 py-1 rounded-xl bg-white/90 dark:bg-blue-950/60 text-[#1D4ED8] dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/40 shadow-xs">
+            Maximum positive Quiz score: 30 pts
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs font-mono">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#070B18] border border-emerald-300 dark:border-emerald-500/40 flex items-center justify-between">
+            <span className="text-slate-600 dark:text-slate-400">Correct answer:</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">+3 pts</span>
+          </div>
+          <div className="p-2.5 sm:p-3 rounded-xl bg-white dark:bg-[#070B18] border border-rose-300 dark:border-rose-500/40 flex items-center justify-between">
+            <span className="text-slate-600 dark:text-slate-400">Wrong answer:</span>
+            <span className="font-bold text-rose-600 dark:text-rose-400">-1 pt</span>
           </div>
         </div>
       </div>
 
-      {/* QUIZ COMPLETION VIEW (Displayed ONLY after Complete & Review is clicked) */}
+      {/* =========================================================================
+          3. SLIM PROGRESS BAR
+         ========================================================================= */}
+      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden mb-4">
+        <div
+          className="bg-[#2563EB] h-full rounded-full transition-all duration-300"
+          style={{ width: `${Math.round((answeredCount / totalQuestions) * 100)}%` }}
+        />
+      </div>
+
+      {/* =========================================================================
+          4. Q1 TO Q10 NAVIGATION ROW
+         ========================================================================= */}
+      <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 mb-6">
+        {QUIZ_QUESTIONS.map((q, idx) => {
+          const isCurrent = currentQuestionIndex === idx;
+          const isAnswered = studentAnswers[q.id] !== undefined;
+
+          return (
+            <button
+              key={q.id}
+              id={`btn-quiz-jump-${q.id}`}
+              disabled={!hasStarted}
+              onClick={() => {
+                soundManager.playNav();
+                navigateToQuestion(idx);
+              }}
+              className={`py-2 text-center text-xs font-mono font-bold rounded-xl border transition-all cursor-pointer ${
+                !hasStarted
+                  ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-[#0B1228] border-slate-200 dark:border-blue-900/30 text-slate-400'
+                  : isCurrent
+                  ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                  : isAnswered
+                  ? 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-300'
+                  : 'bg-white dark:bg-[#0B1228] border-slate-200 dark:border-blue-900/30 text-slate-700 dark:text-slate-300 hover:border-blue-300'
+              }`}
+            >
+              <span>Q{idx + 1}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* QUIZ COMPLETION REVIEW VIEW */}
       {isSubmitted ? (
         <div className="space-y-8">
           <div
             id="quiz-result-card"
             className={`p-6 sm:p-10 lg:p-12 bg-white dark:bg-[#0B1228] rounded-3xl flex flex-col items-center justify-center text-center animate-editorial-scale transition-all ${certificateTheme.cardBorder}`}
           >
-            {/* 1. Top Achievement Trophy Icon */}
-            <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center shadow-lg mx-auto mb-4 sm:mb-5 ${certificateTheme.trophyBg}`}>
+            {/* Top Achievement Trophy Icon */}
+            <div
+              className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center shadow-lg mx-auto mb-4 sm:mb-5 ${certificateTheme.trophyBg}`}
+            >
               <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-white stroke-[2.2]" />
             </div>
 
-            {/* 2. Achievement Badge */}
-            <div className={`inline-flex items-center justify-center px-4 py-1.5 rounded-full font-mono text-[11px] sm:text-xs font-bold tracking-wider uppercase mb-3 sm:mb-4 ${certificateTheme.badge}`}>
-              ★ {feedback.badge} ★
+            {/* Achievement Badge */}
+            <div
+              className={`inline-flex items-center justify-center px-4 py-1.5 rounded-full font-mono text-[11px] sm:text-xs font-bold tracking-wider uppercase mb-3 sm:mb-4 ${certificateTheme.badge}`}
+            >
+              ✦ {feedback.badge} ✦
             </div>
 
-            {/* 3. Main Completion Heading */}
+            {/* Main Completion Heading */}
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#0B192C] dark:text-white tracking-tight uppercase mb-3">
               Single Linked List Knowledge Check Complete!
             </h2>
 
-            {/* 4. Supporting Description */}
+            {/* Supporting Description */}
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-xl mx-auto leading-relaxed font-normal mb-6 sm:mb-8">
               {feedback.message}
             </p>
 
-            {/* 5. Highlighted Score Card */}
-            <div className={`w-full max-w-md mx-auto p-6 sm:p-8 bg-white dark:bg-[#070B18] rounded-3xl flex flex-col items-center justify-center text-center mb-6 sm:mb-8 ${certificateTheme.scoreCardBorder}`}>
-              <span className={`text-[11px] sm:text-xs font-mono font-bold tracking-[0.2em] uppercase mb-2 ${certificateTheme.scoreTag}`}>
-                FINAL HIGHLIGHTED SCORE
+            {/* Highlighted Score Card */}
+            <div
+              className={`w-full max-w-md mx-auto p-6 sm:p-8 bg-white dark:bg-[#070B18] rounded-3xl flex flex-col items-center justify-center text-center mb-6 sm:mb-8 ${certificateTheme.scoreCardBorder}`}
+            >
+              <span
+                className={`text-[11px] sm:text-xs font-mono font-bold tracking-[0.2em] uppercase mb-2 ${certificateTheme.scoreTag}`}
+              >
+                FINAL QUIZ SCORE
               </span>
-              <div className={`text-5xl sm:text-6xl font-black font-sans tracking-tight leading-none my-2 ${certificateTheme.scoreText}`}>
-                {score} / {totalQuestions}
+              <div
+                className={`text-5xl sm:text-6xl font-black font-sans tracking-tight leading-none my-2 ${certificateTheme.scoreText}`}
+              >
+                {currentQuizScore} / 30 pts
               </div>
-              <div className={`mt-3 px-4 py-1.5 rounded-xl font-mono text-xs sm:text-sm font-semibold border ${certificateTheme.accuracyPill}`}>
-                Accuracy: {percentage}%
+              <div
+                className={`mt-3 px-4 py-1.5 rounded-xl font-mono text-xs sm:text-sm font-semibold border ${certificateTheme.accuracyPill}`}
+              >
+                Correct Answers: {score} of {totalQuestions} ({percentage}%)
               </div>
             </div>
 
-            {/* 6. Summary Statistics Cards: Correct Answers, Incorrect Answers, Accuracy */}
+            {/* Summary Statistics Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full max-w-2xl mx-auto">
               <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#070B18] border border-slate-200/90 dark:border-blue-900/40 shadow-xs flex flex-col items-center justify-center text-center">
                 <span className="text-[10px] sm:text-[11px] font-mono font-bold tracking-widest text-slate-400 dark:text-slate-500 uppercase mb-1.5">
-                  CORRECT ANSWERS
+                  CORRECT ANSWERS (+3)
                 </span>
-                <span className={`text-xl sm:text-2xl font-extrabold font-mono flex items-center justify-center gap-1.5 ${certificateTheme.correctStat}`}>
+                <span
+                  className={`text-xl sm:text-2xl font-extrabold font-mono flex items-center justify-center gap-1.5 ${certificateTheme.correctStat}`}
+                >
                   <Check className="w-5 h-5 stroke-[2.5]" />
                   {score}
                 </span>
               </div>
               <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#070B18] border border-slate-200/90 dark:border-blue-900/40 shadow-xs flex flex-col items-center justify-center text-center">
                 <span className="text-[10px] sm:text-[11px] font-mono font-bold tracking-widest text-slate-400 dark:text-slate-500 uppercase mb-1.5">
-                  INCORRECT ANSWERS
+                  INCORRECT (-1)
                 </span>
                 <span className="text-xl sm:text-2xl font-extrabold text-rose-500 dark:text-rose-400 font-mono">
-                  {totalQuestions - score}
+                  {wrongCount}
                 </span>
               </div>
               <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#070B18] border border-slate-200/90 dark:border-blue-900/40 shadow-xs flex flex-col items-center justify-center text-center">
@@ -679,8 +840,18 @@ export const QuizView: React.FC<QuizViewProps> = ({
               </div>
             </div>
 
-            {/* 7. Action Buttons: Review Answers, Retry Quiz, Continue Learning */}
-            <div className="flex flex-wrap items-center justify-center gap-3.5 sm:gap-4 mt-8 w-full max-w-lg mx-auto">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center justify-center gap-3.5 sm:gap-4 mt-8 w-full max-w-xl mx-auto">
+              <button
+                id="btn-quiz-retake"
+                type="button"
+                onClick={handleRetakeQuiz}
+                className="px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white font-sans text-xs sm:text-sm font-semibold shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Retake Quiz</span>
+              </button>
+
               <button
                 id="btn-quiz-review-answers"
                 type="button"
@@ -696,16 +867,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
               </button>
 
               <button
-                id="btn-quiz-retake"
-                type="button"
-                onClick={handleResetQuiz}
-                className="btn-modern-primary px-6 py-2.5 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4 stroke-[2.2]" />
-                <span>Retry Quiz</span>
-              </button>
-
-              <button
                 id="btn-quiz-continue-learning"
                 type="button"
                 onClick={() => {
@@ -716,28 +877,26 @@ export const QuizView: React.FC<QuizViewProps> = ({
                     onNavigateToHome();
                   }
                 }}
-                className="btn-modern-secondary px-5 py-2.5 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                className="btn-modern-primary px-5 py-2.5 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Gamepad2 className="w-4 h-4 text-[#2563EB] dark:text-blue-400" />
+                <Gamepad2 className="w-4 h-4 text-white" />
                 <span>Continue Learning</span>
               </button>
             </div>
           </div>
 
-          {/* 2. QUESTION OVERVIEW SECTION (Directly Below Completion Certificate) */}
+          {/* QUESTION OVERVIEW SECTION */}
           <div id="quiz-question-overview-section" className="space-y-6">
-            {/* Section Heading */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-blue-900/25">
               <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 font-display">
                 <ListOrdered className="w-5 h-5 text-[#2563EB] dark:text-blue-400" />
                 <span>Full Question-by-Question Review</span>
               </h3>
               <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-semibold font-mono">
-                {score} of {totalQuestions} Correct
+                {score} of {totalQuestions} Correct • Final Score: {currentQuizScore} / 30 pts
               </span>
             </div>
 
-            {/* 10 Question Review Cards (Sequential Order 01 to 10) */}
             <div className="space-y-5">
               {QUIZ_QUESTIONS.map((q, idx) => {
                 const rec = studentAnswers[q.id];
@@ -755,7 +914,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
                         : 'border-2 border-rose-300 dark:border-rose-500/50'
                     }`}
                   >
-                    {/* Top Header: Badge + Identifier (Left) & Status Badge (Right) */}
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <div className="flex items-center gap-2.5">
                         <span className="px-3 py-1 bg-[#2563EB] dark:bg-blue-600 text-white rounded-full text-xs font-bold font-mono tracking-wide shadow-xs inline-flex items-center justify-center">
@@ -770,50 +928,57 @@ export const QuizView: React.FC<QuizViewProps> = ({
                         {isCorrect ? (
                           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E6F8F0] dark:bg-emerald-950/60 border border-[#00A86B]/30 dark:border-emerald-500/30 text-[#008A54] dark:text-emerald-300 rounded-lg text-xs font-bold font-sans">
                             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Correct</span>
+                            <span>Correct (+3 pts)</span>
+                          </div>
+                        ) : rec?.isTimeout ? (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold font-sans">
+                            <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>Unanswered / Timed Out (0 pts)</span>
                           </div>
                         ) : (
                           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-bold font-sans">
                             <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Incorrect</span>
+                            <span>Incorrect (-1 pt)</span>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Question Statement */}
                     <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-3.5 mb-4 leading-snug break-words whitespace-pre-line">
                       {cleanQuestionText}
                     </h4>
 
-                    {/* Submission and Correct Answer Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-                      {/* Left: Your Submission */}
                       <div
                         className={`p-3.5 sm:p-4 rounded-xl border ${
                           isCorrect
                             ? 'bg-[#E8FAF0] dark:bg-emerald-950/40 border-[#A7F3D0] dark:border-emerald-500/30'
+                            : rec?.isTimeout
+                            ? 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40'
                             : 'bg-[#FEECEB] dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/30'
                         }`}
                       >
                         <div
                           className={`text-[10px] sm:text-[11px] font-mono font-bold tracking-wider uppercase mb-1.5 font-sans ${
-                            isCorrect ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'
+                            isCorrect
+                              ? 'text-emerald-800 dark:text-emerald-300'
+                              : rec?.isTimeout
+                              ? 'text-amber-800 dark:text-amber-300'
+                              : 'text-rose-700 dark:text-rose-300'
                           }`}
                         >
                           YOUR SUBMISSION:
                         </div>
                         <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 break-words">
-                          {rec
+                          {rec && rec.selectedOptionIndex >= 0
                             ? `${String.fromCharCode(65 + rec.selectedOptionIndex)}: ${rec.selectedAnswerText}`
-                            : 'No Answer Submitted'}
+                            : 'Unanswered / Timed Out'}
                         </div>
                       </div>
 
-                      {/* Right: Correct Answer */}
                       <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 dark:border-blue-900/30 bg-[#F8FAFC] dark:bg-[#070B18]">
                         <div className="text-[10px] sm:text-[11px] font-mono font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400 mb-1.5 font-sans">
-                          CORRECT ANSWER:
+                          CORRECT ANSWER (+3 PTS):
                         </div>
                         <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 break-words">
                           {String.fromCharCode(65 + q.correctIndex)}: {q.correctAnswerText}
@@ -821,7 +986,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Technical Explanation Panel */}
                     <div className="p-4 sm:p-5 rounded-2xl bg-[#F8FAFC] dark:bg-[#070B18] border border-slate-200 dark:border-blue-900/25 text-xs">
                       <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-xs sm:text-sm mb-2">
                         <HelpCircle className="w-4 h-4 text-[#2563EB] dark:text-blue-400" />
@@ -884,56 +1048,102 @@ export const QuizView: React.FC<QuizViewProps> = ({
                 : 'border-slate-200 dark:border-blue-900/30'
             }`}
           >
-            {/* Question Header */}
-            <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-blue-900/20">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 bg-[#2563EB] dark:bg-blue-600 text-white rounded-md text-xs font-bold font-mono shadow-xs">
-                  Question {currentQuestionIndex + 1 < 10 ? `0${currentQuestionIndex + 1}` : currentQuestionIndex + 1} of {totalQuestions}
+            {/* =========================================================================
+                1. START QUIZ BUTTON (PROMINENT BLUE BUTTON AT VERY TOP OF QUESTION CARD)
+               ========================================================================= */}
+            {!hasStarted && (
+              <div id="quiz-start-header-bar" className="mb-6 pb-5 border-b border-slate-100 dark:border-blue-900/30 flex flex-wrap items-center justify-between gap-3">
+                <button
+                  id="btn-start-quiz"
+                  type="button"
+                  onClick={handleStartQuiz}
+                  className="inline-flex items-center gap-2.5 px-6 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm sm:text-base rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-95"
+                >
+                  <Play className="w-5 h-5 fill-white text-white shrink-0" />
+                  <span>Start Quiz</span>
+                </button>
+                <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-sans">
+                  Click to start quiz and unlock answer choices
                 </span>
-                <span className="text-xs font-semibold text-[#2563EB] dark:text-blue-300 font-mono">{currentQuestion.techniqueCode}</span>
+              </div>
+            )}
+
+            {/* =========================================================================
+                2. DIFFICULTY, QUESTION-TYPE LABELS & 20-SECOND COUNTDOWN TIMER
+               ========================================================================= */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`px-3 py-1 rounded-lg text-xs font-bold font-mono border ${
+                    currentQuestion.id <= 4
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
+                      : currentQuestion.id <= 7
+                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/40'
+                      : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/40'
+                  }`}
+                >
+                  {currentQuestion.id <= 4
+                    ? '★ BASIC LEVEL'
+                    : currentQuestion.id <= 7
+                    ? '★★ INTERMEDIATE'
+                    : '★★★ HARD LEVEL'}
+                </span>
+                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold font-mono">
+                  MULTIPLE CHOICE
+                </span>
               </div>
 
-              {isCurrentQuestionAnswered && (
-                <div>
-                  {currentAnswerRecord?.isCorrect ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 rounded-lg">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>Correct</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 dark:bg-rose-950/60 text-xs font-bold text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 rounded-lg">
-                      <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                      <span>Incorrect</span>
-                    </span>
-                  )}
+              {/* 20-Second Countdown Timer Display */}
+              {hasStarted && !isCurrentQuestionAnswered && (
+                <div
+                  id="quiz-question-timer"
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border font-mono font-bold text-xs sm:text-sm shadow-xs transition-colors ${
+                    timeLeft <= 5
+                      ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 animate-pulse'
+                      : 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300'
+                  }`}
+                >
+                  <Clock className={`w-4 h-4 shrink-0 ${timeLeft <= 5 ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'}`} />
+                  <span>Time: {timeLeft}s</span>
                 </div>
               )}
             </div>
 
-            {/* Question Statement */}
+            {/* =========================================================================
+                3. QUESTION TEXT
+               ========================================================================= */}
             <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-6 leading-snug break-words whitespace-pre-line">
               {currentQuestion.question}
             </p>
 
-            {/* Answer Options */}
+            {/* =========================================================================
+                4. ANSWER OPTIONS
+               ========================================================================= */}
             <div className="space-y-3">
               {currentQuestion.options.map((opt, optIdx) => {
                 const isSelected = pendingSelection === optIdx;
-                let optStyle =
-                  'bg-white dark:bg-[#080D1F] border-slate-200 dark:border-blue-900/30 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-slate-50 dark:hover:bg-[#0F1733] text-slate-800 dark:text-slate-200';
+                let optStyle = '';
 
-                if (isCurrentQuestionAnswered) {
+                if (!hasStarted) {
+                  optStyle =
+                    'bg-slate-50/70 dark:bg-[#080D1F]/60 border-slate-200/80 dark:border-blue-900/20 text-slate-400 dark:text-slate-500 opacity-60 cursor-not-allowed select-none';
+                } else if (isCurrentQuestionAnswered) {
                   if (optIdx === currentQuestion.correctIndex) {
                     optStyle =
-                      'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-bold ring-2 ring-emerald-400 dark:ring-emerald-500/40';
+                      'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-bold ring-2 ring-emerald-400 dark:ring-emerald-500/40 cursor-default';
                   } else if (isSelected && !currentAnswerRecord?.isCorrect) {
-                    optStyle = 'bg-rose-50 dark:bg-rose-950/60 border-rose-400 text-rose-950 dark:text-rose-200 font-bold';
+                    optStyle =
+                      'bg-rose-50 dark:bg-rose-950/60 border-rose-400 text-rose-950 dark:text-rose-200 font-bold cursor-default';
                   } else {
-                    optStyle = 'bg-white dark:bg-[#080D1F] opacity-40 border-slate-200 dark:border-blue-900/20 text-slate-400 dark:text-slate-500';
+                    optStyle =
+                      'bg-white dark:bg-[#080D1F] opacity-40 border-slate-200 dark:border-blue-900/20 text-slate-400 dark:text-slate-500 cursor-not-allowed';
                   }
                 } else if (isSelected) {
                   optStyle =
-                    'bg-[#EFF6FF] dark:bg-blue-950/60 border-[#2563EB] dark:border-blue-500 text-[#1D4ED8] dark:text-blue-200 font-semibold ring-2 ring-[#2563EB]/40 dark:ring-blue-500/30';
+                    'bg-[#EFF6FF] dark:bg-blue-950/60 border-[#2563EB] dark:border-blue-500 text-[#1D4ED8] dark:text-blue-200 font-semibold ring-2 ring-[#2563EB]/40 dark:ring-blue-500/30 cursor-pointer';
+                } else {
+                  optStyle =
+                    'bg-white dark:bg-[#080D1F] border-slate-200 dark:border-blue-900/30 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-slate-50 dark:hover:bg-[#0F1733] text-slate-800 dark:text-slate-200 cursor-pointer';
                 }
 
                 return (
@@ -941,13 +1151,15 @@ export const QuizView: React.FC<QuizViewProps> = ({
                     key={optIdx}
                     id={`quiz-q${currentQuestion.id}-opt${optIdx}`}
                     onClick={() => handleSelectOption(optIdx)}
-                    disabled={isCurrentQuestionAnswered && isSubmitted}
+                    disabled={!hasStarted || isCurrentQuestionAnswered}
                     style={{ animationDelay: `${(optIdx + 1) * 60}ms` }}
-                    className={`w-full p-4 text-left text-sm font-sans rounded-xl border transition-all flex items-start gap-3.5 cursor-pointer animate-chapter-switch ${optStyle}`}
+                    className={`w-full p-4 text-left text-sm font-sans rounded-xl border transition-all flex items-start gap-3.5 animate-chapter-switch ${optStyle}`}
                   >
                     <span
                       className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border text-xs font-bold font-mono ${
-                        isSelected
+                        !hasStarted
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
+                          : isSelected
                           ? isCurrentQuestionAnswered
                             ? optIdx === currentQuestion.correctIndex
                               ? 'bg-emerald-600 text-white border-emerald-600'
@@ -964,70 +1176,72 @@ export const QuizView: React.FC<QuizViewProps> = ({
               })}
             </div>
 
-            {/* Answer Confirmation / Next Button Bar */}
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-blue-900/20 flex flex-wrap items-center justify-between gap-3">
+            {/* =========================================================================
+                5. EXISTING ANSWER SUBMISSION CONTROLS
+               ========================================================================= */}
+            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-blue-900/20 flex flex-wrap items-center justify-between gap-3">
+              {/* Previous Question Button */}
               <button
-                disabled={currentQuestionIndex === 0}
+                disabled={currentQuestionIndex === 0 || !hasStarted}
                 onClick={() => {
                   soundManager.playNav();
-                  setCurrentQuestionIndex((prev) => Math.max(0, prev - 1));
+                  navigateToQuestion(Math.max(0, currentQuestionIndex - 1));
                 }}
-                className={`btn-modern-secondary px-4 py-2 text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  currentQuestionIndex === 0 ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'cursor-pointer'
+                className={`px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#070B18] text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 transition-all ${
+                  currentQuestionIndex === 0 || !hasStarted
+                    ? 'opacity-40 cursor-not-allowed pointer-events-none'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer shadow-xs'
                 }`}
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Previous</span>
+                ← Previous Question
               </button>
 
-              {!isCurrentQuestionAnswered ? (
-                currentQuestionIndex < totalQuestions - 1 ? (
+              {/* Right Action Buttons */}
+              <div className="flex items-center gap-3">
+                {!hasStarted ? (
+                  <button
+                    disabled
+                    className="bg-[#93C5FD] dark:bg-blue-900/40 text-white font-bold px-6 py-2.5 rounded-xl text-xs sm:text-sm cursor-not-allowed opacity-60"
+                  >
+                    Submit Answer
+                  </button>
+                ) : !isCurrentQuestionAnswered ? (
                   <button
                     id="btn-confirm-answer"
                     disabled={pendingSelection === null}
                     onClick={handleConfirmAnswer}
-                    className={`btn-modern-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all ${
-                      pendingSelection !== null ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed pointer-events-none'
+                    className={`px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white transition-all flex items-center gap-2 ${
+                      pendingSelection !== null
+                        ? 'bg-[#2563EB] hover:bg-blue-700 shadow-xs cursor-pointer'
+                        : 'bg-[#93C5FD] dark:bg-blue-900/40 cursor-not-allowed opacity-60'
                     }`}
                   >
                     <Check className="w-4 h-4" />
                     <span>Submit Answer</span>
                   </button>
+                ) : currentQuestionIndex < totalQuestions - 1 ? (
+                  <button
+                    id="btn-next-question"
+                    onClick={() => {
+                      soundManager.playClick();
+                      navigateToQuestion(currentQuestionIndex + 1);
+                    }}
+                    className="bg-[#2563EB] hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-xs text-xs sm:text-sm flex items-center gap-2 cursor-pointer transition-all"
+                  >
+                    <span>Next Question</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
                 ) : (
                   <button
                     id="btn-finish-quiz"
-                    disabled={pendingSelection === null}
                     onClick={handleSubmitExamination}
-                    className={`btn-modern-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all ${
-                      pendingSelection !== null ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed pointer-events-none'
-                    }`}
+                    className="bg-[#2563EB] hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-xs text-xs sm:text-sm flex items-center gap-2 cursor-pointer transition-all"
                   >
                     <Award className="w-4 h-4" />
                     <span>Complete & Review</span>
                   </button>
-                )
-              ) : currentQuestionIndex < totalQuestions - 1 ? (
-                <button
-                  id="btn-next-question"
-                  onClick={() => {
-                    soundManager.playClick();
-                    setCurrentQuestionIndex((prev) => prev + 1);
-                  }}
-                  className="btn-modern-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer"
-                >
-                  <span>Next Question</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  id="btn-finish-quiz"
-                  onClick={handleSubmitExamination}
-                  className="btn-modern-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer"
-                >
-                  <Award className="w-4 h-4" />
-                  <span>Complete & Review</span>
-                </button>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Technical Explanation Panel (visible once answered) */}

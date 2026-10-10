@@ -1,14 +1,24 @@
 import { ActivityRecord, ModuleRecord, ModuleStatus, SLLActivityCategory, UserProgressState } from '../types/game';
 
-const STORAGE_KEY_V3 = 'algolearn_sll_100_points_progress_v3';
+const STORAGE_KEY_V4 = 'algolearn_sll_100_points_progress_v4';
+const STORAGE_KEY_V3_LEGACY = 'algolearn_sll_100_points_progress_v3';
 
 export const TOTAL_POINTS_MAX = 100;
 export const TOTAL_CONCEPTS = 15;
+
+/**
+ * NEW POINT SYSTEM CONFIGURATION:
+ * Total maximum positive points: 100
+ * - Learn/Theory: 0 points (removed all point rewards)
+ * - Visualization: 10 points (2 videos @ 5 points each)
+ * - Game: 60 points (Insertion 25, Deletion 25, Traversal 10)
+ * - Quiz: 30 points (10 questions @ +3 correct, -1 wrong, 0 timeout)
+ */
 export const CATEGORY_MAX = {
-  learn: 25,
-  visualize: 15,
-  game: 40,
-  quiz: 20,
+  learn: 0,
+  visualize: 10,
+  game: 60,
+  quiz: 30,
 } as const;
 
 export const LEARN_ACTIVITIES: Array<{
@@ -17,34 +27,44 @@ export const LEARN_ACTIVITIES: Array<{
   title: string;
   points: number;
 }> = [
-  { id: 'learn_intro', theoryChapterId: 'theory-01', title: 'Introduction to SLL', points: 1 },
-  { id: 'learn_operations', theoryChapterId: 'theory-02', title: 'Operations of SLL', points: 2 },
-  { id: 'learn_insert_beginning', theoryChapterId: 'theory-03', title: 'Insert at Beginning', points: 2 },
-  { id: 'learn_insert_end', theoryChapterId: 'theory-04', title: 'Insert at End', points: 2 },
-  { id: 'learn_insert_position', theoryChapterId: 'theory-05', title: 'Insert at Position', points: 2 },
-  { id: 'learn_delete_beginning', theoryChapterId: 'theory-06', title: 'Delete at Beginning', points: 2 },
-  { id: 'learn_delete_end', theoryChapterId: 'theory-07', title: 'Delete at End', points: 2 },
-  { id: 'learn_delete_position', theoryChapterId: 'theory-08', title: 'Delete at Position', points: 2 },
-  { id: 'learn_searching', theoryChapterId: 'theory-09', title: 'Searching', points: 2 },
-  { id: 'learn_display', theoryChapterId: 'theory-10', title: 'Display', points: 1 },
-  { id: 'learn_complexities', theoryChapterId: 'theory-11', title: 'Time Complexities', points: 2 },
-  { id: 'learn_advantages', theoryChapterId: 'theory-12', title: 'Advantages', points: 1 },
-  { id: 'learn_disadvantages', theoryChapterId: 'theory-13', title: 'Disadvantages', points: 1 },
-  { id: 'learn_applications', theoryChapterId: 'theory-14', title: 'Applications', points: 3 },
-  { id: 'learn_mastery', theoryChapterId: 'theory-15', title: 'Learn Completion / Mastery', points: 2 },
+  { id: 'learn_intro', theoryChapterId: 'theory-01', title: 'Introduction to SLL', points: 0 },
+  { id: 'learn_operations', theoryChapterId: 'theory-02', title: 'Operations of SLL', points: 0 },
+  { id: 'learn_insert_beginning', theoryChapterId: 'theory-03', title: 'Insert at Beginning', points: 0 },
+  { id: 'learn_insert_end', theoryChapterId: 'theory-04', title: 'Insert at End', points: 0 },
+  { id: 'learn_insert_position', theoryChapterId: 'theory-05', title: 'Insert at Position', points: 0 },
+  { id: 'learn_delete_beginning', theoryChapterId: 'theory-06', title: 'Delete at Beginning', points: 0 },
+  { id: 'learn_delete_end', theoryChapterId: 'theory-07', title: 'Delete at End', points: 0 },
+  { id: 'learn_delete_position', theoryChapterId: 'theory-08', title: 'Delete at Position', points: 0 },
+  { id: 'learn_searching', theoryChapterId: 'theory-09', title: 'Searching', points: 0 },
+  { id: 'learn_display', theoryChapterId: 'theory-10', title: 'Display', points: 0 },
+  { id: 'learn_complexities', theoryChapterId: 'theory-11', title: 'Time Complexities', points: 0 },
+  { id: 'learn_advantages', theoryChapterId: 'theory-12', title: 'Advantages', points: 0 },
+  { id: 'learn_disadvantages', theoryChapterId: 'theory-13', title: 'Disadvantages', points: 0 },
+  { id: 'learn_applications', theoryChapterId: 'theory-14', title: 'Applications', points: 0 },
+  { id: 'learn_mastery', theoryChapterId: 'theory-15', title: 'Learn Completion / Mastery', points: 0 },
 ];
 
+/**
+ * 2 VISUALIZATION VIDEOS (5 POINTS EACH = 10 POINTS TOTAL)
+ */
 export const VISUALIZE_ACTIVITIES: Array<{
   id: string;
   title: string;
   points: number;
   description: string;
 }> = [
-  { id: 'visualize_node', title: 'Node Visualization', points: 3, description: 'Node creation, DATA, NEXT, HEAD, NULL structure' },
-  { id: 'visualize_linking', title: 'Linking Nodes', points: 3, description: 'Connecting nodes via sequential pointer references' },
-  { id: 'visualize_traversal', title: 'Traversal Visualization', points: 3, description: 'Sequential linear traversal from HEAD to NULL' },
-  { id: 'visualize_insertion', title: 'Insertion Visualization', points: 3, description: 'Insert at beginning, end, and specific position' },
-  { id: 'visualize_deletion', title: 'Deletion Visualization', points: 3, description: 'Delete at beginning, end, and specific position' },
+  {
+    id: 'lesson-01',
+    title: 'Introduction to Singly Linked List',
+    points: 5,
+    description: 'Foundations of Singly Linked Lists, node structure, head and tail pointers',
+  },
+  {
+    id: 'lesson-02',
+    title: 'Singly Linked List Operations',
+    points: 5,
+    description: 'Mastering insertions, deletions, linear search, and pointer updates',
+  },
 ];
 
 export const GAME_ACTIVITIES: Record<'insertion' | 'deletion' | 'traversal', {
@@ -53,28 +73,36 @@ export const GAME_ACTIVITIES: Record<'insertion' | 'deletion' | 'traversal', {
   title: string;
   baseScore: number;
 }> = {
-  insertion: { id: 'game_insertion', categoryName: 'insertion', title: 'Insertion Game', baseScore: 15 },
-  deletion: { id: 'game_deletion', categoryName: 'deletion', title: 'Deletion Game', baseScore: 15 },
-  traversal: { id: 'game_traversal', categoryName: 'traversal', title: 'Traversal Game', baseScore: 10 },
+  insertion: { id: 'game_insertion', categoryName: 'insertion', title: 'Insertion Level', baseScore: 25 },
+  deletion: { id: 'game_deletion', categoryName: 'deletion', title: 'Deletion Level', baseScore: 25 },
+  traversal: { id: 'game_traversal', categoryName: 'traversal', title: 'Traversal Level', baseScore: 10 },
 };
 
 export interface GameTaskScoringState {
-  taskId: string; // e.g. "game_insertion_create_node"
-  internalId: string; // e.g. "L1_T1"
+  taskId: string;
+  internalId: string;
   category: 'insertion' | 'deletion' | 'traversal';
   title: string;
   baseScore: number;
   hintUsed: boolean;
   guideUsed: boolean;
   conceptUsed: boolean;
-  hintPenalty: number; // 2 if hintUsed, else 0
-  guidePenalty: number; // 3 if guideUsed, else 0
-  finalScore: number; // Math.max(0, baseScore - hintPenalty - guidePenalty)
+  hintCount?: number;
+  guideCount?: number;
+  hintPenalty: number; // 2 per hint use
+  guidePenalty: number; // 3 per guide solve use
+  finalScore: number;
   completed: boolean;
   attempts?: number;
   completedAt?: number;
 }
 
+/**
+ * GAME LEVEL TASKS (TOTAL 60 POINTS):
+ * Insertion: 25 points (6 + 6 + 6 + 7)
+ * Deletion: 25 points (8 + 8 + 9)
+ * Traversal: 10 points (10)
+ */
 export const GAME_TASK_DEFINITIONS: Record<string, {
   taskId: string;
   internalId: string;
@@ -87,49 +115,49 @@ export const GAME_TASK_DEFINITIONS: Record<string, {
     internalId: 'L1_T1',
     category: 'insertion',
     title: 'Create a Node',
-    baseScore: 4,
+    baseScore: 6,
   },
   game_insertion_beginning: {
     taskId: 'game_insertion_beginning',
     internalId: 'L1_T3',
     category: 'insertion',
     title: 'Insert at Beginning',
-    baseScore: 4,
+    baseScore: 6,
   },
   game_insertion_end: {
     taskId: 'game_insertion_end',
     internalId: 'L1_T4',
     category: 'insertion',
     title: 'Insert at End',
-    baseScore: 4,
+    baseScore: 6,
   },
   game_insertion_position: {
     taskId: 'game_insertion_position',
     internalId: 'L4_T1',
     category: 'insertion',
     title: 'Insert at Any Position',
-    baseScore: 3,
+    baseScore: 7,
   },
   game_deletion_beginning: {
     taskId: 'game_deletion_beginning',
     internalId: 'L2_T1',
     category: 'deletion',
     title: 'Delete at Beginning',
-    baseScore: 5,
+    baseScore: 8,
   },
   game_deletion_end: {
     taskId: 'game_deletion_end',
     internalId: 'L2_T2',
     category: 'deletion',
     title: 'Delete at End',
-    baseScore: 5,
+    baseScore: 8,
   },
   game_deletion_position: {
     taskId: 'game_deletion_position',
     internalId: 'L4_T2',
     category: 'deletion',
     title: 'Delete at Any Position',
-    baseScore: 5,
+    baseScore: 9,
   },
   game_traversal_print: {
     taskId: 'game_traversal_print',
@@ -171,6 +199,8 @@ export function createDefaultGameTasks(): Record<string, GameTaskScoringState> {
       hintUsed: false,
       guideUsed: false,
       conceptUsed: false,
+      hintCount: 0,
+      guideCount: 0,
       hintPenalty: 0,
       guidePenalty: 0,
       finalScore: 0,
@@ -181,26 +211,44 @@ export function createDefaultGameTasks(): Record<string, GameTaskScoringState> {
   return result;
 }
 
+export interface QuizQuestionRecord {
+  questionId: number;
+  status: 'correct' | 'wrong' | 'timeout' | 'unanswered';
+  points: number; // +3, -1, 0
+  selectedOptionIndex?: number;
+  answeredAt?: number;
+}
+
+export interface QuizSessionState {
+  hasStarted: boolean;
+  currentQuestionIndex: number;
+  timeLeft: number;
+  isSubmitted: boolean;
+  studentAnswers: Record<number, any>;
+}
+
 export interface CentralizedProgressState {
   version: number;
   totalPoints: number; // 0 - 100
-  learnScore: number; // 0 - 25
-  visualizeScore: number; // 0 - 15
-  gameScore: number; // 0 - 40
-  quizScore: number; // 0 - 20
+  learnScore: number; // strictly 0
+  visualizeScore: number; // 0 - 10
+  gameScore: number; // 0 - 60
+  quizScore: number; // 0 - 30
   completedActivities: Record<string, ActivityRecord>;
   gameTasks: Record<string, GameTaskScoringState>;
-  gameAssistance: Record<string, { hintUsed: boolean; guideUsed: boolean; attempts: number }>;
+  gameAssistance: Record<string, { hintUsed: boolean; guideUsed: boolean; hintCount?: number; guideCount?: number; attempts: number }>;
+  quizQuestions: Record<number, QuizQuestionRecord>;
   hasCelebrated100Percent: boolean;
   lastActiveTimestamp: number;
   completedVideos?: string[];
   levelsCompleted?: number[];
   totalScore?: number;
   quizSubmitted?: boolean;
+  quizSession?: QuizSessionState;
 }
 
 const INITIAL_CENTRAL_STATE: CentralizedProgressState = {
-  version: 3,
+  version: 4,
   totalPoints: 0,
   learnScore: 0,
   visualizeScore: 0,
@@ -209,19 +257,36 @@ const INITIAL_CENTRAL_STATE: CentralizedProgressState = {
   completedActivities: {},
   gameTasks: createDefaultGameTasks(),
   gameAssistance: {},
+  quizQuestions: {},
   hasCelebrated100Percent: false,
   lastActiveTimestamp: Date.now(),
   completedVideos: [],
   levelsCompleted: [],
   totalScore: 0,
   quizSubmitted: false,
+  quizSession: {
+    hasStarted: false,
+    currentQuestionIndex: 0,
+    timeLeft: 20,
+    isSubmitted: false,
+    studentAnswers: {},
+  },
 };
 
 type ProgressListener = (state: CentralizedProgressState) => void;
 
+export interface PointDeductionNotification {
+  id: number;
+  points: number;
+  reason: 'Guided Solve Used' | 'Hint Used';
+}
+
+export type DeductionListener = (notification: PointDeductionNotification) => void;
+
 class ProgressManager {
   private state: CentralizedProgressState;
   private listeners: Set<ProgressListener> = new Set();
+  private deductionListeners: Set<DeductionListener> = new Set();
 
   constructor() {
     this.state = this.loadState();
@@ -232,117 +297,112 @@ class ProgressManager {
   private loadState(): CentralizedProgressState {
     if (typeof window === 'undefined') return INITIAL_CENTRAL_STATE;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY_V3);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && typeof parsed === 'object') {
-          const gameTasks = createDefaultGameTasks();
-          if (parsed.gameTasks && typeof parsed.gameTasks === 'object') {
-            for (const [k, v] of Object.entries(parsed.gameTasks)) {
-              const canonical = toCanonicalGameTaskId(k);
-              if (gameTasks[canonical] && v && typeof v === 'object') {
-                const val = v as Partial<GameTaskScoringState>;
-                gameTasks[canonical] = {
-                  ...gameTasks[canonical],
-                  ...val,
-                  taskId: canonical,
-                  baseScore: GAME_TASK_DEFINITIONS[canonical].baseScore,
-                  internalId: GAME_TASK_DEFINITIONS[canonical].internalId,
-                  category: GAME_TASK_DEFINITIONS[canonical].category,
-                  title: GAME_TASK_DEFINITIONS[canonical].title,
-                };
-              }
-            }
-          }
+      let stored = localStorage.getItem(STORAGE_KEY_V4);
+      let legacyData: any = null;
 
-          // Check completedActivities for legacy or task records
-          const completedActivities: Record<string, ActivityRecord> = { ...(parsed.completedActivities || {}) };
-
-          // Remove legacy bulk category activities if any exist (so they don't skew points)
-          delete completedActivities['game_insertion'];
-          delete completedActivities['game_deletion'];
-          delete completedActivities['game_traversal'];
-
-          // Sync gameTasks with completedActivities & enforce strict negative marking
-          for (const [taskKey, taskDef] of Object.entries(GAME_TASK_DEFINITIONS)) {
-            const canonical = taskKey;
-            const internal = taskDef.internalId;
-            const rec = completedActivities[canonical] || completedActivities[internal];
-            if (rec && rec.category === 'game') {
-              gameTasks[canonical].completed = true;
-              gameTasks[canonical].hintUsed = Boolean(rec.metadata?.hintUsed ?? gameTasks[canonical].hintUsed);
-              gameTasks[canonical].guideUsed = Boolean(rec.metadata?.guideUsed ?? gameTasks[canonical].guideUsed);
-              gameTasks[canonical].conceptUsed = Boolean(rec.metadata?.conceptUsed ?? gameTasks[canonical].conceptUsed);
-              gameTasks[canonical].hintPenalty = gameTasks[canonical].hintUsed ? 2 : 0;
-              gameTasks[canonical].guidePenalty = gameTasks[canonical].guideUsed ? 3 : 0;
-              gameTasks[canonical].finalScore = Math.max(
-                0,
-                taskDef.baseScore - gameTasks[canonical].hintPenalty - gameTasks[canonical].guidePenalty
-              );
-              completedActivities[canonical] = {
-                id: canonical,
-                category: 'game',
-                pointsAwarded: gameTasks[canonical].finalScore,
-                maxPoints: taskDef.baseScore,
-                completedAt: rec.completedAt || Date.now(),
-                metadata: {
-                  ...rec.metadata,
-                  taskId: canonical,
-                  internalId: internal,
-                  category: taskDef.category,
-                  baseScore: taskDef.baseScore,
-                  hintUsed: gameTasks[canonical].hintUsed,
-                  guideUsed: gameTasks[canonical].guideUsed,
-                  conceptUsed: gameTasks[canonical].conceptUsed,
-                  hintPenalty: gameTasks[canonical].hintPenalty,
-                  guidePenalty: gameTasks[canonical].guidePenalty,
-                  finalScore: gameTasks[canonical].finalScore,
-                  attempts: gameTasks[canonical].attempts || 1,
-                },
-              };
-              if (internal !== canonical) {
-                delete completedActivities[internal];
-              }
-            } else if (gameTasks[canonical].completed) {
-              gameTasks[canonical].hintPenalty = gameTasks[canonical].hintUsed ? 2 : 0;
-              gameTasks[canonical].guidePenalty = gameTasks[canonical].guideUsed ? 3 : 0;
-              gameTasks[canonical].finalScore = Math.max(
-                0,
-                taskDef.baseScore - gameTasks[canonical].hintPenalty - gameTasks[canonical].guidePenalty
-              );
-              completedActivities[canonical] = {
-                id: canonical,
-                category: 'game',
-                pointsAwarded: gameTasks[canonical].finalScore,
-                maxPoints: taskDef.baseScore,
-                completedAt: gameTasks[canonical].completedAt || Date.now(),
-                metadata: {
-                  taskId: canonical,
-                  internalId: internal,
-                  category: taskDef.category,
-                  baseScore: taskDef.baseScore,
-                  hintUsed: gameTasks[canonical].hintUsed,
-                  guideUsed: gameTasks[canonical].guideUsed,
-                  conceptUsed: gameTasks[canonical].conceptUsed,
-                  hintPenalty: gameTasks[canonical].hintPenalty,
-                  guidePenalty: gameTasks[canonical].guidePenalty,
-                  finalScore: gameTasks[canonical].finalScore,
-                  attempts: gameTasks[canonical].attempts || 1,
-                },
-              };
-            }
-          }
-
-          const state: CentralizedProgressState = {
-            ...INITIAL_CENTRAL_STATE,
-            ...parsed,
-            completedActivities,
-            gameTasks,
-            gameAssistance: parsed.gameAssistance || {},
-          };
-
-          return state;
+      if (!stored) {
+        // Fallback to check legacy v3 for data migration
+        stored = localStorage.getItem(STORAGE_KEY_V3_LEGACY);
+        if (stored) {
+          legacyData = JSON.parse(stored);
         }
+      }
+
+      const raw = stored ? (legacyData || JSON.parse(stored)) : null;
+
+      if (raw && typeof raw === 'object') {
+        const gameTasks = createDefaultGameTasks();
+        if (raw.gameTasks && typeof raw.gameTasks === 'object') {
+          for (const [k, v] of Object.entries(raw.gameTasks)) {
+            const canonical = toCanonicalGameTaskId(k);
+            if (gameTasks[canonical] && v && typeof v === 'object') {
+              const val = v as Partial<GameTaskScoringState>;
+              const def = GAME_TASK_DEFINITIONS[canonical];
+              const hintUsed = Boolean(val.hintUsed);
+              const guideUsed = Boolean(val.guideUsed);
+              const hintCount = val.hintCount || (hintUsed ? 1 : 0);
+              const guideCount = val.guideCount || (guideUsed ? 1 : 0);
+              const hintPenalty = hintCount * 2;
+              const guidePenalty = guideCount * 3;
+              const finalScore = val.completed
+                ? Math.max(0, def.baseScore - hintPenalty - guidePenalty)
+                : 0;
+
+              gameTasks[canonical] = {
+                ...gameTasks[canonical],
+                ...val,
+                taskId: canonical,
+                baseScore: def.baseScore,
+                internalId: def.internalId,
+                category: def.category,
+                title: def.title,
+                hintUsed,
+                guideUsed,
+                hintCount,
+                guideCount,
+                hintPenalty,
+                guidePenalty,
+                finalScore,
+              };
+            }
+          }
+        }
+
+        const completedActivities: Record<string, ActivityRecord> = { ...(raw.completedActivities || {}) };
+
+        // Zero out any legacy learn activity points
+        Object.keys(completedActivities).forEach((id) => {
+          if (completedActivities[id]?.category === 'learn') {
+            completedActivities[id].pointsAwarded = 0;
+            completedActivities[id].maxPoints = 0;
+          }
+        });
+
+        // Clean up any legacy bulk activities
+        delete completedActivities['game_insertion'];
+        delete completedActivities['game_deletion'];
+        delete completedActivities['game_traversal'];
+
+        // Synchronize game tasks into completed activities with updated scoring
+        for (const [taskKey, taskDef] of Object.entries(GAME_TASK_DEFINITIONS)) {
+          const canonical = taskKey;
+          const rec = completedActivities[canonical] || completedActivities[taskDef.internalId];
+          if (rec && rec.category === 'game') {
+            gameTasks[canonical].completed = true;
+            completedActivities[canonical] = {
+              id: canonical,
+              category: 'game',
+              pointsAwarded: gameTasks[canonical].finalScore,
+              maxPoints: taskDef.baseScore,
+              completedAt: rec.completedAt || Date.now(),
+              metadata: {
+                ...rec.metadata,
+                taskId: canonical,
+                internalId: taskDef.internalId,
+                category: taskDef.category,
+                baseScore: taskDef.baseScore,
+                hintUsed: gameTasks[canonical].hintUsed,
+                guideUsed: gameTasks[canonical].guideUsed,
+                hintPenalty: gameTasks[canonical].hintPenalty,
+                guidePenalty: gameTasks[canonical].guidePenalty,
+                finalScore: gameTasks[canonical].finalScore,
+              },
+            };
+          }
+        }
+
+        // Migrate or initialize quiz questions
+        const quizQuestions: Record<number, QuizQuestionRecord> = raw.quizQuestions || {};
+
+        return {
+          ...INITIAL_CENTRAL_STATE,
+          ...raw,
+          version: 4,
+          completedActivities,
+          gameTasks,
+          quizQuestions,
+          gameAssistance: raw.gameAssistance || {},
+        };
       }
       return INITIAL_CENTRAL_STATE;
     } catch {
@@ -354,7 +414,7 @@ class ProgressManager {
     if (typeof window === 'undefined') return;
     try {
       this.state.lastActiveTimestamp = Date.now();
-      localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(this.state));
+      localStorage.setItem(STORAGE_KEY_V4, JSON.stringify(this.state));
       this.notifyListeners();
     } catch (e) {
       console.error('Error saving progress to localStorage', e);
@@ -367,6 +427,28 @@ class ProgressManager {
     return () => {
       this.listeners.delete(listener);
     };
+  }
+
+  public onPointDeduction(callback: DeductionListener): () => void {
+    this.deductionListeners.add(callback);
+    return () => {
+      this.deductionListeners.delete(callback);
+    };
+  }
+
+  public emitPointDeduction(points: number, reason: 'Guided Solve Used' | 'Hint Used') {
+    const notif: PointDeductionNotification = {
+      id: Date.now() + Math.random(),
+      points,
+      reason,
+    };
+    this.deductionListeners.forEach((fn) => {
+      try {
+        fn(notif);
+      } catch (err) {
+        console.error('Error in deduction listener', err);
+      }
+    });
   }
 
   private notifyListeners() {
@@ -392,7 +474,7 @@ class ProgressManager {
       completedVideos: VISUALIZE_ACTIVITIES.filter((a) => this.isCompleted(a.id)).map((a) => a.id),
       levelsCompleted: levelsDone,
       totalScore: this.getTotalPoints(),
-      quizSubmitted: this.isCompleted('quiz_single_linked_list'),
+      quizSubmitted: this.isCompleted('quiz_single_linked_list') || Boolean(raw.quizSubmitted),
     };
   }
 
@@ -405,7 +487,7 @@ class ProgressManager {
   }
 
   // =========================================================================
-  // CORE 100-POINT SCORING SYSTEM API
+  // CORE 100-POINT SCORING API
   // =========================================================================
 
   public getTotalPoints(): number {
@@ -415,7 +497,7 @@ class ProgressManager {
   public getCategoryScore(category: SLLActivityCategory): number {
     switch (category) {
       case 'learn':
-        return Math.min(CATEGORY_MAX.learn, Math.max(0, this.state.learnScore));
+        return 0; // Strictly 0 points
       case 'visualize':
         return Math.min(CATEGORY_MAX.visualize, Math.max(0, this.state.visualizeScore));
       case 'game':
@@ -451,29 +533,55 @@ class ProgressManager {
   }
 
   /**
-   * Recalculate total points & category scores from recorded activities
+   * Recalculates total points and all category scores
    */
   private recalculateScores() {
-    let learn = 0;
     let visualize = 0;
     let game = 0;
     let quiz = 0;
 
     Object.values(this.state.completedActivities).forEach((rec) => {
-      if (rec.category === 'learn') learn += rec.pointsAwarded;
-      else if (rec.category === 'visualize') visualize += rec.pointsAwarded;
-      else if (rec.category === 'game') game += rec.pointsAwarded;
-      else if (rec.category === 'quiz') quiz += rec.pointsAwarded;
+      if (rec.category === 'visualize') {
+        visualize += rec.pointsAwarded;
+      } else if (rec.category === 'game') {
+        game += rec.pointsAwarded;
+      } else if (rec.category === 'quiz') {
+        // If question-by-question scoring is not active yet, use bulk record
+        if (!this.state.quizQuestions || Object.keys(this.state.quizQuestions).length === 0) {
+          quiz += rec.pointsAwarded;
+        }
+      }
     });
 
-    this.state.learnScore = Math.min(CATEGORY_MAX.learn, Math.max(0, learn));
+    // If real-time question-by-question quiz records exist, they are the source of truth
+    if (this.state.quizQuestions && Object.keys(this.state.quizQuestions).length > 0) {
+      let qPointsSum = 0;
+      Object.values(this.state.quizQuestions).forEach((qRec) => {
+        qPointsSum += qRec.points;
+      });
+      quiz = Math.min(CATEGORY_MAX.quiz, Math.max(0, qPointsSum));
+    }
+
+    // Live ongoing penalties (Guided Solve and Hint) on active (uncompleted) tasks
+    const ongoingGamePenalties = Object.values(this.state.gameTasks || {})
+      .filter((t) => !t.completed)
+      .reduce(
+        (sum, t) =>
+          sum +
+          (t.guidePenalty || ((t.guideCount || 0) * 3)) +
+          (t.hintPenalty || ((t.hintCount || 0) * 2)),
+        0
+      );
+
+    this.state.learnScore = 0; // Strictly zero points for Learn/Theory
     this.state.visualizeScore = Math.min(CATEGORY_MAX.visualize, Math.max(0, visualize));
-    this.state.gameScore = Math.min(CATEGORY_MAX.game, Math.max(0, game));
+    this.state.gameScore = Math.min(CATEGORY_MAX.game, Math.max(0, game - ongoingGamePenalties));
     this.state.quizScore = Math.min(CATEGORY_MAX.quiz, Math.max(0, quiz));
     this.state.totalPoints = Math.min(
       100,
-      Math.max(0, this.state.learnScore + this.state.visualizeScore + this.state.gameScore + this.state.quizScore)
+      Math.max(0, this.state.visualizeScore + this.state.gameScore + this.state.quizScore)
     );
+    this.state.totalScore = this.state.totalPoints;
   }
 
   /**
@@ -493,7 +601,7 @@ class ProgressManager {
     const maxAllowed = CATEGORY_MAX[category];
     const currentScore = this.getCategoryScore(category);
     const roomInCat = Math.max(0, maxAllowed - currentScore);
-    const actualAward = Math.min(points, roomInCat);
+    const actualAward = category === 'learn' ? 0 : Math.min(points, roomInCat);
 
     const record: ActivityRecord = {
       id: activityId,
@@ -511,7 +619,7 @@ class ProgressManager {
   }
 
   /**
-   * Complete a Learn section (1 to 15)
+   * Complete Learn section: Keep tracking completion, but award ZERO points
    */
   public completeLearnSection(sectionNumber: number): { newlyCompleted: boolean; pointsAwarded: number } {
     const item = LEARN_ACTIVITIES[sectionNumber - 1];
@@ -521,8 +629,8 @@ class ProgressManager {
       return { newlyCompleted: false, pointsAwarded: 0 };
     }
 
-    const awarded = this.markCompleted(item.id, 'learn', item.points, { sectionNumber, title: item.title });
-    return { newlyCompleted: awarded, pointsAwarded: awarded ? item.points : 0 };
+    const awarded = this.markCompleted(item.id, 'learn', 0, { sectionNumber, title: item.title });
+    return { newlyCompleted: awarded, pointsAwarded: 0 };
   }
 
   public completeLearnByChapterId(chapterId: string): { newlyCompleted: boolean; pointsAwarded: number } {
@@ -532,7 +640,9 @@ class ProgressManager {
   }
 
   /**
-   * Complete a Visualize activity (1 to 5)
+   * Complete a Visualize video (lesson-01 or lesson-02)
+   * Awards 5 points per video up to 10 points max. Incomplete videos receive 0 points.
+   * Duplicate protection prevents repeated points on replaying.
    */
   public completeVisualizeActivity(activityId: string): { newlyCompleted: boolean; pointsAwarded: number } {
     const act = VISUALIZE_ACTIVITIES.find((v) => v.id === activityId);
@@ -566,6 +676,8 @@ class ProgressManager {
         hintUsed: false,
         guideUsed: false,
         conceptUsed: false,
+        hintCount: 0,
+        guideCount: 0,
         hintPenalty: 0,
         guidePenalty: 0,
         finalScore: 0,
@@ -581,10 +693,12 @@ class ProgressManager {
       internalId: canonical,
       category: 'insertion',
       title: canonical,
-      baseScore: 4,
+      baseScore: 6,
       hintUsed: false,
       guideUsed: false,
       conceptUsed: false,
+      hintCount: 0,
+      guideCount: 0,
       hintPenalty: 0,
       guidePenalty: 0,
       finalScore: 0,
@@ -593,46 +707,61 @@ class ProgressManager {
     };
   }
 
+  /**
+   * Applies deductions for actual Hint (-2 pts) and Guided Solve (-3 pts) usage.
+   * Subsequent genuine uses apply additional deductions while preventing duplicate deductions for the exact same event.
+   */
   public recordGameTaskAssistance(id: string, type: 'hint' | 'guide' | 'concept'): void {
     const canonical = toCanonicalGameTaskId(id);
     const task = this.getGameTaskState(canonical);
 
-    // Apply penalties only once per assistance type (no multiple deductions)
     if (type === 'hint') {
       task.hintUsed = true;
-      task.hintPenalty = 2;
+      task.hintCount = (task.hintCount || 0) + 1;
+      task.hintPenalty = task.hintCount * 2;
     } else if (type === 'guide') {
       task.guideUsed = true;
-      task.guidePenalty = 3;
+      task.guideCount = (task.guideCount || 0) + 1;
+      task.guidePenalty = task.guideCount * 3;
     } else if (type === 'concept') {
       task.conceptUsed = true;
-      // CONCEPT HAS NO PENALTY (0 XP)
     }
 
-    // Maintain backwards compatibility in gameAssistance map
     if (!this.state.gameAssistance[canonical]) {
-      this.state.gameAssistance[canonical] = { hintUsed: false, guideUsed: false, attempts: 1 };
-    }
-    if (!this.state.gameAssistance[task.internalId]) {
-      this.state.gameAssistance[task.internalId] = { hintUsed: false, guideUsed: false, attempts: 1 };
+      this.state.gameAssistance[canonical] = { hintUsed: false, guideUsed: false, attempts: 1, hintCount: 0, guideCount: 0 };
     }
     if (type === 'hint') {
       this.state.gameAssistance[canonical].hintUsed = true;
-      this.state.gameAssistance[task.internalId].hintUsed = true;
+      this.state.gameAssistance[canonical].hintCount = task.hintCount;
     } else if (type === 'guide') {
       this.state.gameAssistance[canonical].guideUsed = true;
-      this.state.gameAssistance[task.internalId].guideUsed = true;
+      this.state.gameAssistance[canonical].guideCount = task.guideCount;
     }
 
-    // CRITICAL: DO NOT subtract from global score when help is clicked!
-    // Simply persist the task's assistance flag so it is applied on completion.
+    this.recalculateScores();
     this.saveState();
+
+    if (type === 'hint') {
+      this.emitPointDeduction(2, 'Hint Used');
+    }
   }
 
-  public recordGameAssistance(
-    keyOrTaskId: string,
-    type: 'hint' | 'guide' | 'concept'
-  ): void {
+  /**
+   * Explicit GUIDEDSOLVE point deduction:
+   * Deducts 3 points from user total points on every activation, including repeated clicks in same level.
+   */
+  public deductGuidedSolvePoints(taskId: string): number {
+    this.recordGameTaskAssistance(taskId, 'guide');
+    this.emitPointDeduction(3, 'Guided Solve Used');
+    return this.getTotalPoints();
+  }
+
+  public deductHintPoints(taskId: string): number {
+    this.recordGameTaskAssistance(taskId, 'hint');
+    return this.getTotalPoints();
+  }
+
+  public recordGameAssistance(keyOrTaskId: string, type: 'hint' | 'guide' | 'concept'): void {
     this.recordGameTaskAssistance(keyOrTaskId, type);
   }
 
@@ -661,8 +790,8 @@ class ProgressManager {
   }
 
   /**
-   * Calculate penalty formula strictly:
-   * finalScore = Math.max(0, baseScore - (guideUsed ? 3 : 0) - (hintUsed ? 2 : 0))
+   * Calculates game score with deductions:
+   * finalScore = Math.max(0, baseScore - (hintPenalty) - (guidePenalty))
    */
   public calculateGameScore(
     category: 'insertion' | 'deletion' | 'traversal',
@@ -679,8 +808,8 @@ class ProgressManager {
     if (taskId) {
       const canonical = toCanonicalGameTaskId(taskId);
       const task = this.getGameTaskState(canonical);
-      const hintPenalty = task.hintUsed ? 2 : 0;
-      const guidePenalty = task.guideUsed ? 3 : 0;
+      const hintPenalty = task.hintPenalty || (task.hintUsed ? 2 : 0);
+      const guidePenalty = task.guidePenalty || (task.guideUsed ? 3 : 0);
       const totalPenalty = hintPenalty + guidePenalty;
       const finalScore = Math.max(0, task.baseScore - totalPenalty);
       return {
@@ -694,7 +823,7 @@ class ProgressManager {
       };
     }
 
-    const baseScore = category === 'traversal' ? 10 : 15;
+    const baseScore = category === 'traversal' ? 10 : 25;
     return {
       baseScore,
       hintUsed: false,
@@ -707,7 +836,7 @@ class ProgressManager {
   }
 
   /**
-   * Complete a specific Game Task and calculate negative marking accurately.
+   * Complete a game task: Awards configured points with negative marking.
    * Duplicate protection: Replays award 0 XP.
    */
   public completeGameTask(taskId: string): {
@@ -723,11 +852,10 @@ class ProgressManager {
     const canonical = toCanonicalGameTaskId(taskId);
     const task = this.getGameTaskState(canonical);
 
-    // DUPLICATE PROTECTION:
-    // If task was already completed, return 0 additional points
+    // DUPLICATE PROTECTION: If already completed, award 0 additional points
     if (task.completed === true || this.isCompleted(canonical)) {
-      const hintPenalty = task.hintUsed ? 2 : 0;
-      const guidePenalty = task.guideUsed ? 3 : 0;
+      const hintPenalty = task.hintPenalty || (task.hintUsed ? 2 : 0);
+      const guidePenalty = task.guidePenalty || (task.guideUsed ? 3 : 0);
       return {
         newlyCompleted: false,
         task,
@@ -740,8 +868,8 @@ class ProgressManager {
       };
     }
 
-    const hintPenalty = task.hintUsed ? 2 : 0;
-    const guidePenalty = task.guideUsed ? 3 : 0;
+    const hintPenalty = task.hintPenalty || (task.hintUsed ? 2 : 0);
+    const guidePenalty = task.guidePenalty || (task.guideUsed ? 3 : 0);
     const totalPenalty = hintPenalty + guidePenalty;
     const finalScore = Math.max(0, task.baseScore - totalPenalty);
 
@@ -751,7 +879,6 @@ class ProgressManager {
     task.completed = true;
     task.completedAt = Date.now();
 
-    // DUPLICATE PROTECTION: Only award finalScore ONCE in completedActivities
     const maxAllowed = CATEGORY_MAX.game;
     const currentScore = this.getCategoryScore('game');
     const roomInCat = Math.max(0, maxAllowed - currentScore);
@@ -795,9 +922,6 @@ class ProgressManager {
     };
   }
 
-  /**
-   * Awards game category / task points with duplicate protection
-   */
   public completeGameCategory(
     category: 'insertion' | 'deletion' | 'traversal',
     taskId?: string
@@ -814,7 +938,7 @@ class ProgressManager {
       return this.completeGameTask(taskId);
     }
 
-    const base = category === 'traversal' ? 10 : 15;
+    const base = category === 'traversal' ? 10 : 25;
     return {
       newlyCompleted: false,
       baseScore: base,
@@ -840,49 +964,68 @@ class ProgressManager {
   }
 
   // =========================================================================
-  // QUIZ ENGINE (20 POINTS MAX)
+  // QUIZ ENGINE (10 QUESTIONS, +3 CORRECT, -1 WRONG, 0 TIMEOUT, 30 PTS MAX)
   // =========================================================================
 
-  public recordQuizScore(
-    correctCount: number,
-    totalQuestions: number,
-    studentAnswers?: any
-  ): {
-    newlyCompleted: boolean;
-    quizScore: number;
-    pointsAwarded: number;
-  } {
-    if (totalQuestions <= 0) return { newlyCompleted: false, quizScore: 0, pointsAwarded: 0 };
-
-    const calculatedPoints = Math.min(20, Math.round((correctCount / totalQuestions) * 20));
-    const activityId = 'quiz_single_linked_list';
-
-    // If already completed previously, update only if higher or keep recorded
-    const existing = this.getActivity(activityId);
-    if (existing) {
-      if (calculatedPoints > existing.pointsAwarded) {
-        const diff = calculatedPoints - existing.pointsAwarded;
-        existing.pointsAwarded = calculatedPoints;
-        existing.metadata = { correctCount, totalQuestions, studentAnswers, percentage: Math.round((correctCount / totalQuestions) * 100) };
-        this.recalculateScores();
-        this.saveState();
-        return { newlyCompleted: false, quizScore: calculatedPoints, pointsAwarded: diff };
-      }
-      return { newlyCompleted: false, quizScore: existing.pointsAwarded, pointsAwarded: 0 };
+  /**
+   * Real-time question evaluation: Immediately award (+3) or deduct (-1) points,
+   * or award 0 on timeout. Prevents duplicate submissions.
+   */
+  public recordQuizQuestion(
+    questionId: number,
+    status: 'correct' | 'wrong' | 'timeout',
+    selectedOptionIndex?: number
+  ): { points: number; quizScore: number; totalScore: number; isDuplicate: boolean } {
+    if (!this.state.quizQuestions) {
+      this.state.quizQuestions = {};
     }
 
-    const awarded = this.markCompleted(activityId, 'quiz', calculatedPoints, {
-      correctCount,
-      totalQuestions,
-      studentAnswers,
-      percentage: Math.round((correctCount / totalQuestions) * 100),
-    });
+    // DUPLICATE PROTECTION: Question already answered or timed-out cannot be scored again
+    const existing = this.state.quizQuestions[questionId];
+    if (existing && existing.status !== 'unanswered') {
+      return {
+        points: existing.points,
+        quizScore: this.getCategoryScore('quiz'),
+        totalScore: this.getTotalPoints(),
+        isDuplicate: true,
+      };
+    }
+
+    let pointsAwarded = 0;
+    if (status === 'correct') {
+      pointsAwarded = 3;
+    } else if (status === 'wrong') {
+      pointsAwarded = -1;
+    } else {
+      pointsAwarded = 0; // Timeout or unanswered = 0
+    }
+
+    this.state.quizQuestions[questionId] = {
+      questionId,
+      status,
+      points: pointsAwarded,
+      selectedOptionIndex,
+      answeredAt: Date.now(),
+    };
+
+    // Recalculate Quiz category score
+    this.recalculateScores();
+    this.saveState();
 
     return {
-      newlyCompleted: awarded,
-      quizScore: calculatedPoints,
-      pointsAwarded: awarded ? calculatedPoints : 0,
+      points: pointsAwarded,
+      quizScore: this.getCategoryScore('quiz'),
+      totalScore: this.getTotalPoints(),
+      isDuplicate: false,
     };
+  }
+
+  public getQuizQuestionRecord(questionId: number): QuizQuestionRecord | undefined {
+    return this.state.quizQuestions?.[questionId];
+  }
+
+  public getAllQuizQuestions(): Record<number, QuizQuestionRecord> {
+    return this.state.quizQuestions || {};
   }
 
   public recordQuizCompletion(
@@ -890,10 +1033,75 @@ class ProgressManager {
     correctCount: number,
     totalQuestions: number
   ) {
-    return this.recordQuizScore(correctCount, totalQuestions, studentAnswers);
+    this.state.quizSubmitted = true;
+    const activityId = 'quiz_single_linked_list';
+
+    // Calculate sum from individual question records if available
+    let calculatedPoints = 0;
+    if (this.state.quizQuestions && Object.keys(this.state.quizQuestions).length > 0) {
+      let sum = 0;
+      Object.values(this.state.quizQuestions).forEach((q) => {
+        sum += q.points;
+      });
+      calculatedPoints = Math.min(30, Math.max(0, sum));
+    } else {
+      // Fallback calculation
+      calculatedPoints = Math.min(30, Math.max(0, correctCount * 3));
+    }
+
+    this.markCompleted(activityId, 'quiz', calculatedPoints, {
+      correctCount,
+      totalQuestions,
+      studentAnswers,
+      percentage: Math.round((correctCount / Math.max(1, totalQuestions)) * 100),
+    });
+
+    return {
+      newlyCompleted: true,
+      quizScore: this.getCategoryScore('quiz'),
+      pointsAwarded: calculatedPoints,
+    };
   }
 
-  public resetQuizAttempt() {
+  public saveQuizSession(session: Partial<QuizSessionState>): void {
+    const current = this.getQuizSession();
+    this.state.quizSession = {
+      ...current,
+      ...session,
+    };
+    if (session.isSubmitted !== undefined) {
+      this.state.quizSubmitted = session.isSubmitted;
+    }
+    this.saveState();
+  }
+
+  public getQuizSession(): QuizSessionState {
+    const defaultSession: QuizSessionState = {
+      hasStarted: false,
+      currentQuestionIndex: 0,
+      timeLeft: 20,
+      isSubmitted: false,
+      studentAnswers: {},
+    };
+    if (this.state.quizSession && typeof this.state.quizSession === 'object') {
+      return {
+        ...defaultSession,
+        ...this.state.quizSession,
+      };
+    }
+    return defaultSession;
+  }
+
+  public resetQuizSession(): void {
+    this.state.quizSession = {
+      hasStarted: false,
+      currentQuestionIndex: 0,
+      timeLeft: 20,
+      isSubmitted: false,
+      studentAnswers: {},
+    };
+    this.state.quizQuestions = {};
+    this.state.quizSubmitted = false;
     delete this.state.completedActivities['quiz_single_linked_list'];
     this.recalculateScores();
     this.saveState();
@@ -934,40 +1142,12 @@ class ProgressManager {
   }
 
   public getTotalActivitiesCount(): number {
-    // 15 Learn + 5 Visualize + 8 Game Tasks + 1 Quiz = 29
-    return 29;
+    // 15 Learn + 2 Videos + 8 Game Tasks + 10 Quiz Questions = 35
+    return 35;
   }
 
   public setCelebrationAcknowledged() {
     this.state.hasCelebrated100Percent = true;
-    this.saveState();
-  }
-
-  public resetProgress() {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem(STORAGE_KEY_V3);
-        localStorage.removeItem('sll_quiz_answers_v1');
-        localStorage.removeItem('sll_quiz_submitted_v1');
-        localStorage.removeItem('sll_completed_tasks');
-      } catch {
-        // Ignore
-      }
-    }
-
-    this.state = {
-      version: 3,
-      totalPoints: 0,
-      learnScore: 0,
-      visualizeScore: 0,
-      gameScore: 0,
-      quizScore: 0,
-      completedActivities: {},
-      gameTasks: createDefaultGameTasks(),
-      gameAssistance: {},
-      hasCelebrated100Percent: false,
-      lastActiveTimestamp: Date.now(),
-    };
     this.saveState();
   }
 
@@ -980,31 +1160,28 @@ class ProgressManager {
     const quizRec = this.getActivity('quiz_single_linked_list');
 
     return {
-      version: 2,
+      version: 4,
       modules: {},
       moduleProgress: {},
       completedTheoryChapters: completedTheory,
       currentTheoryChapterId: 'theory-01',
       levelCompletedKeys: {},
       levelsCompleted: [
-        this.isCompleted('game_insertion') ? 1 : 0,
-        this.isCompleted('game_deletion') ? 2 : 0,
-        this.isCompleted('game_traversal') ? 3 : 0,
+        this.isTopicComplete('insertion') ? 1 : 0,
+        this.isTopicComplete('deletion') ? 2 : 0,
+        this.isTopicComplete('traversal') ? 3 : 0,
       ].filter((x) => x > 0),
       levelsMastered: [],
       quizScores: quizRec?.metadata?.studentAnswers || {},
-      quizSubmitted: Boolean(quizRec),
-      quizFinalScore: quizRec?.pointsAwarded ? Math.round((quizRec.pointsAwarded / 20) * 100) : 0,
+      quizSubmitted: Boolean(this.state.quizSubmitted || quizRec),
+      quizFinalScore: this.getCategoryScore('quiz'),
       sandboxOperationsCount: 0,
       totalScore: this.getTotalPoints(),
       streak: 0,
       currentActiveModuleId: 'fn-01-basics',
       lastActiveTimestamp: this.state.lastActiveTimestamp,
       hasCelebrated100Percent: this.state.hasCelebrated100Percent,
-      completedVideos: [
-        this.isCompleted('visualize_node') ? 'lesson-01' : '',
-        this.isCompleted('visualize_traversal') ? 'lesson-02' : '',
-      ].filter(Boolean),
+      completedVideos: VISUALIZE_ACTIVITIES.filter((a) => this.isCompleted(a.id)).map((a) => a.id),
     };
   }
 
@@ -1025,24 +1202,28 @@ class ProgressManager {
       theory: {
         total: 15,
         completed: LEARN_ACTIVITIES.filter((a) => this.isCompleted(a.id)).length,
-        percentage: Math.round((this.getCategoryScore('learn') / 25) * 100),
+        percentage: 0, // 0 points
       },
       video: {
-        total: 5,
+        total: 2,
         completed: VISUALIZE_ACTIVITIES.filter((a) => this.isCompleted(a.id)).length,
-        percentage: Math.round((this.getCategoryScore('visualize') / 15) * 100),
+        percentage: Math.round((this.getCategoryScore('visualize') / 10) * 100),
       },
       game: {
         total: 3,
-        completed: ['game_insertion', 'game_deletion', 'game_traversal'].filter((id) => this.isCompleted(id)).length,
-        percentage: Math.round((this.getCategoryScore('game') / 40) * 100),
+        completed: [
+          this.isTopicComplete('insertion') ? 'game_insertion' : null,
+          this.isTopicComplete('deletion') ? 'game_deletion' : null,
+          this.isTopicComplete('traversal') ? 'game_traversal' : null,
+        ].filter(Boolean).length,
+        percentage: Math.round((this.getCategoryScore('game') / 60) * 100),
       },
       quiz: {
-        total: 1,
-        completed: this.isCompleted('quiz_single_linked_list') ? 1 : 0,
-        isSubmitted: this.isCompleted('quiz_single_linked_list'),
+        total: 10,
+        completed: Object.values(this.state.quizQuestions || {}).filter((q) => q.status !== 'unanswered').length,
+        isSubmitted: Boolean(this.state.quizSubmitted || this.isCompleted('quiz_single_linked_list')),
         finalScore: this.getCategoryScore('quiz'),
-        percentage: Math.round((this.getCategoryScore('quiz') / 20) * 100),
+        percentage: Math.round((this.getCategoryScore('quiz') / 30) * 100),
       },
       nextModule: this.getModules().find((m) => m.status !== 'COMPLETED') || null,
     };
@@ -1053,7 +1234,7 @@ class ProgressManager {
     return {
       total: 15,
       completed: completedList.length,
-      percentage: Math.round((this.getCategoryScore('learn') / 25) * 100),
+      percentage: Math.round((completedList.length / 15) * 100),
       isComplete: completedList.length >= 15,
       completedIds: completedList,
       currentChapterId: 'theory-01',
@@ -1063,34 +1244,39 @@ class ProgressManager {
   public getVideoStats() {
     const completedIds = VISUALIZE_ACTIVITIES.filter((a) => this.isCompleted(a.id)).map((a) => a.id);
     return {
-      total: 5,
+      total: 2,
       completed: completedIds.length,
-      percentage: Math.round((this.getCategoryScore('visualize') / 15) * 100),
-      isComplete: completedIds.length >= 5,
+      percentage: Math.round((this.getCategoryScore('visualize') / 10) * 100),
+      isComplete: completedIds.length >= 2,
       completedVideos: completedIds,
     };
   }
 
   public getGameStats() {
-    const ids = ['game_insertion', 'game_deletion', 'game_traversal'].filter((id) => this.isCompleted(id));
+    const ids = [
+      this.isTopicComplete('insertion') ? 'game_insertion' : null,
+      this.isTopicComplete('deletion') ? 'game_deletion' : null,
+      this.isTopicComplete('traversal') ? 'game_traversal' : null,
+    ].filter(Boolean) as string[];
     return {
       total: 3,
       completed: ids.length,
-      percentage: Math.round((this.getCategoryScore('game') / 40) * 100),
+      percentage: Math.round((this.getCategoryScore('game') / 60) * 100),
       isComplete: ids.length >= 3,
       completedLevels: ids,
     };
   }
 
   public getQuizStats() {
-    const isSubmitted = this.isCompleted('quiz_single_linked_list');
+    const isSubmitted = Boolean(this.state.quizSubmitted || this.isCompleted('quiz_single_linked_list'));
+    const answeredCount = Object.values(this.state.quizQuestions || {}).filter((q) => q.status !== 'unanswered').length;
     return {
-      total: 1,
-      completed: isSubmitted ? 1 : 0,
-      percentage: isSubmitted ? 100 : 0,
+      total: 10,
+      completed: answeredCount,
+      percentage: Math.round((this.getCategoryScore('quiz') / 30) * 100),
       isSubmitted,
       finalScore: this.getCategoryScore('quiz'),
-      isComplete: isSubmitted,
+      isComplete: isSubmitted || answeredCount === 10,
     };
   }
 
@@ -1125,13 +1311,8 @@ class ProgressManager {
     }
   }
 
-  public addScore(points: number) {
-    // If external callers call addScore, do not artificially inflate beyond 100
-    // Real points must be tied to activities
-    if (points > 0 && this.state.totalPoints < 100) {
-      this.state.totalPoints = Math.min(100, this.state.totalPoints + points);
-      this.saveState();
-    }
+  public addScore(_points: number) {
+    // Score is strictly tied to real activities
   }
 
   public startModule(_moduleId: string) {}
@@ -1148,14 +1329,26 @@ class ProgressManager {
         code: `SLL-${String(idx + 1).padStart(2, '0')}`,
         title: item.title,
         category: 'FOUNDATION',
-        description: `Learn ${item.title} and earn ${item.points} pts.`,
+        description: `Learn ${item.title}.`,
         status: (isDone ? 'COMPLETED' : 'NOT_STARTED') as ModuleStatus,
         progressPercent: isDone ? 100 : 0,
-        criteriaDescription: `Complete learning activity to earn ${item.points} point(s).`,
+        criteriaDescription: `Complete learning chapter ${item.title}.`,
         targetTab: 'THEORY',
         targetChapterId: item.theoryChapterId,
       };
     });
+  }
+
+  public resetProgress(): void {
+    this.state = {
+      ...INITIAL_CENTRAL_STATE,
+      gameTasks: createDefaultGameTasks(),
+      completedActivities: {},
+      gameAssistance: {},
+      quizQuestions: {},
+      lastActiveTimestamp: Date.now(),
+    };
+    this.saveState();
   }
 }
 

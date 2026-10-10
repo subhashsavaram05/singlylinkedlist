@@ -68,10 +68,15 @@ export const SLLTopicSelectMenu: React.FC<SLLTopicSelectMenuProps> = ({
                   {getTopicIcon(topic.id)}
                 </div>
 
-                {/* Master Level Badge with Vector Crown Icon */}
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#EFF6FF] dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-300 border border-blue-200/80 dark:border-blue-900/40">
-                  <Crown className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
-                  <span>Master Level</span>
+                {/* Master Level Badge with Vector Crown Icon & Level Reward Badge */}
+                <div className="flex items-center justify-between w-full">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#EFF6FF] dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-300 border border-blue-200/80 dark:border-blue-900/40">
+                    <Crown className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400" />
+                    <span>Master Level</span>
+                  </div>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 shadow-xs">
+                    {topic.id === 'traversal' ? '+10 pts' : '+25 pts'}
+                  </span>
                 </div>
 
                 {/* Topic Title */}

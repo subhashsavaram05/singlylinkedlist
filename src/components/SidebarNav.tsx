@@ -6,7 +6,6 @@ import {
   Gamepad2,
   HelpCircle,
   TrendingUp,
-  Trophy,
   X,
 } from 'lucide-react';
 import { MainViewTab } from '../types/game';
@@ -36,13 +35,11 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
 }) => {
   const { theme } = useTheme();
   const [stats, setStats] = React.useState(() => progressManager.getStats());
-  const [totalPoints, setTotalPoints] = React.useState(() => progressManager.getTotalPoints());
   const [isProgressHovered, setIsProgressHovered] = useState(false);
 
   React.useEffect(() => {
     const unsub = progressManager.subscribe(() => {
       setStats(progressManager.getStats());
-      setTotalPoints(progressManager.getTotalPoints());
     });
     return unsub;
   }, []);
@@ -60,7 +57,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       id: 'THEORY' as MainViewTab,
       label: 'Learn',
       icon: BookOpen,
-      badge: `${progressManager.getCategoryScore('learn')} / 25`,
+      badge: `${stats.theory.completed} / 15`,
       badgeClass: 'bg-[#EFF6FF] dark:bg-blue-950/50 text-[#2563EB] dark:text-blue-300 border border-[#DBEAFE] dark:border-blue-900/30 font-mono',
       alwaysShowBadge: false,
     },
@@ -68,7 +65,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       id: 'VIDEO' as MainViewTab,
       label: 'Visualize',
       icon: Sparkles,
-      badge: `${progressManager.getCategoryScore('visualize')} / 15`,
+      badge: `${progressManager.getCategoryScore('visualize')} / 10`,
       badgeClass: 'bg-[#EFF6FF] dark:bg-blue-950/50 text-[#2563EB] dark:text-blue-300 border border-[#DBEAFE] dark:border-blue-900/30 font-mono',
       alwaysShowBadge: false,
     },
@@ -76,7 +73,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       id: 'GAME' as MainViewTab,
       label: 'Game',
       icon: Gamepad2,
-      badge: `${progressManager.getCategoryScore('game')} / 40`,
+      badge: `${progressManager.getCategoryScore('game')} / 60`,
       badgeClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/20 font-mono',
       alwaysShowBadge: false,
     },
@@ -84,7 +81,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       id: 'QUIZ' as MainViewTab,
       label: 'Quiz',
       icon: HelpCircle,
-      badge: `${progressManager.getCategoryScore('quiz')} / 20`,
+      badge: `${progressManager.getCategoryScore('quiz')} / 30`,
       badgeClass: 'bg-[#EFF6FF] dark:bg-blue-900/40 text-[#2563EB] dark:text-blue-300 border border-[#DBEAFE] dark:border-blue-900/30 font-mono',
       alwaysShowBadge: false,
     },
@@ -95,14 +92,6 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       badge: `${stats.percentage}%`,
       badgeClass: 'bg-[#EFF6FF] dark:bg-blue-800/40 text-[#2563EB] dark:text-blue-200 font-bold border border-[#DBEAFE] dark:border-blue-900/40 font-mono',
       alwaysShowBadge: false,
-    },
-    {
-      id: 'POINTS' as MainViewTab,
-      label: 'Points',
-      icon: Trophy,
-      badge: `${totalPoints} / 100`,
-      badgeClass: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-500/30 font-mono',
-      alwaysShowBadge: true,
     },
   ];
 
@@ -189,7 +178,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                 <span className="font-sans">{item.label}</span>
               </div>
 
-              {/* Detailed progress values are hidden by default and smoothly fade in on hover, except Points which is always visible */}
+              {/* Detailed progress values are hidden by default and smoothly fade in on hover */}
               <span
                 className={`text-[11px] px-2 py-0.5 rounded-full font-medium transition-opacity duration-200 ease-in-out ${item.badgeClass} ${
                   item.alwaysShowBadge ? 'opacity-100' : isProgressHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'

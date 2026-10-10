@@ -49,7 +49,7 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
 
   // Default to visualizer so interactive 15-point visualization activities are immediately accessible
   const [selectedLesson, setSelectedLesson] = useState<LessonItem | null>(() => lessons[0] || null);
-  const [activePlayerMode, setActivePlayerMode] = useState<'video' | 'visualizer'>('visualizer');
+  const [activePlayerMode, setActivePlayerMode] = useState<'video' | 'visualizer'>('video');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
@@ -255,17 +255,23 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
     setCurrentTime(newTime);
   }, [duration]);
 
-  // Timeline scrubber seek
+  // Timeline scrubber seek - prevent seeking forward (only backward navigation allowed)
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
+    const curr = videoRef.current ? videoRef.current.currentTime : currentTime;
+    if (time > curr + 0.5) {
+      // Prevent seeking forward
+      return;
+    }
     setCurrentTime(time);
     if (videoRef.current) {
       videoRef.current.currentTime = time;
     }
   };
 
-  // Speed selector
+  // Speed selector - capped at 1x to prevent fast-forwarding
   const handleChangeSpeed = useCallback((spd: number) => {
+    if (spd > 1) return; // Prevent fast-forwarding
     soundManager.playVideoSpeed();
     setPlaybackSpeed(spd);
     if (videoRef.current) {
@@ -448,9 +454,6 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
       } else if (e.key === 'k' || e.key === 'K') {
         e.preventDefault();
         pauseVideoStrict();
-      } else if (e.key === 'l' || e.key === 'L') {
-        e.preventDefault();
-        handleForward();
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         toggleFullscreen();
@@ -461,7 +464,7 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [togglePlay, handleRewind, pauseVideoStrict, handleForward, toggleFullscreen]);
+  }, [togglePlay, handleRewind, pauseVideoStrict, toggleFullscreen]);
 
   // Sync document fullscreen state
   useEffect(() => {
@@ -516,6 +519,11 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
                         }`}
                       >
                         {lesson.lessonNumber}
+                      </span>
+
+                      {/* Prominent +5 pts reward badge */}
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 shadow-2xs">
+                        +5 pts
                       </span>
 
                       {isCompleted && (
@@ -885,14 +893,6 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
                     <span className="uppercase font-bold">{isPlaying ? 'Pause' : 'Play'}</span>
                   </button>
-
-                  <button
-                    onClick={handleForward}
-                    className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors cursor-pointer active:scale-95 flex items-center justify-center"
-                    title="Forward 10s (L)"
-                  >
-                    <RotateCw className="w-4 h-4" />
-                  </button>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -986,17 +986,6 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
                   <span className="tracking-wide uppercase font-bold text-xs">{isPlaying ? 'Pause' : 'Play'}</span>
                 </button>
 
-                <button
-                  id="btn-video-forward"
-                  onClick={handleForward}
-                  disabled={hasError}
-                  className="h-9 w-9 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#091433] dark:hover:bg-blue-950/60 border border-slate-200/90 dark:border-blue-900/40 text-slate-700 dark:text-slate-300 transition-all cursor-pointer active:scale-95 flex items-center justify-center shrink-0"
-                  title="Forward 10s (L)"
-                  aria-label="Forward 10 seconds"
-                >
-                  <RotateCw className="w-4 h-4" />
-                </button>
-
                 {/* Current Time / Total Duration */}
                 <div className="flex items-center gap-1.5 text-xs font-mono font-semibold text-slate-600 dark:text-blue-300/90 pl-1.5">
                   <span id="video-current-time">{formatTime(currentTime)}</span>
@@ -1058,8 +1047,8 @@ export const VideoTutorialsView: React.FC<VideoTutorialsViewProps> = ({ video1Sr
                         <span className="text-[10px] font-mono font-bold uppercase text-slate-400 dark:text-blue-300/70 block mb-1.5">
                           Playback Speed
                         </span>
-                        <div className="grid grid-cols-4 gap-1">
-                          {[0.5, 1, 1.25, 1.5].map((spd) => (
+                        <div className="grid grid-cols-3 gap-1">
+                          {[0.5, 0.75, 1].map((spd) => (
                             <button
                               key={spd}
                               onClick={() => {

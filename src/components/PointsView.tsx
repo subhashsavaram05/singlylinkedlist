@@ -11,9 +11,19 @@ import {
   Trophy,
   Star,
   Check,
-  RotateCcw,
+  XCircle,
+  Clock,
+  Circle,
 } from 'lucide-react';
-import { progressManager, CentralizedProgressState, LEARN_ACTIVITIES, VISUALIZE_ACTIVITIES, GAME_ACTIVITIES, GAME_TASK_LIST } from '../utils/progressManager';
+import {
+  progressManager,
+  CentralizedProgressState,
+  LEARN_ACTIVITIES,
+  VISUALIZE_ACTIVITIES,
+  GAME_ACTIVITIES,
+  GAME_TASK_LIST,
+} from '../utils/progressManager';
+import { QUIZ_QUESTIONS } from './QuizView';
 import { MainViewTab } from '../types/game';
 import { soundManager } from '../utils/audio';
 import { useScrollReveal } from '../hooks/useScrollReveal';
@@ -23,7 +33,7 @@ interface PointsViewProps {
   onResetProgress?: () => void;
 }
 
-export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onResetProgress }) => {
+export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab }) => {
   useScrollReveal();
   const [state, setState] = useState<CentralizedProgressState>(() => progressManager.getCentralState());
 
@@ -35,35 +45,48 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
   }, []);
 
   const totalPoints = state.totalPoints;
-  const learnScore = state.learnScore;
   const visualizeScore = state.visualizeScore;
   const gameScore = state.gameScore;
   const quizScore = state.quizScore;
   const mastery = progressManager.getMasteryLevel(totalPoints);
   const percentage = progressManager.getProgressPercentage();
 
+  // Completed levels status
+  const insertionTasks = GAME_TASK_LIST.filter((t) => t.category === 'insertion');
+  const deletionTasks = GAME_TASK_LIST.filter((t) => t.category === 'deletion');
+  const traversalTasks = GAME_TASK_LIST.filter((t) => t.category === 'traversal');
+
+  const insertionDone = insertionTasks.every((t) => progressManager.isCompleted(t.taskId));
+  const deletionDone = deletionTasks.every((t) => progressManager.isCompleted(t.taskId));
+  const traversalDone = traversalTasks.every((t) => progressManager.isCompleted(t.taskId));
+
+  const insertionScore = insertionTasks.reduce((sum, t) => {
+    const ts = progressManager.getGameTaskState(t.taskId);
+    return sum + (ts.completed ? ts.finalScore : 0);
+  }, 0);
+
+  const deletionScore = deletionTasks.reduce((sum, t) => {
+    const ts = progressManager.getGameTaskState(t.taskId);
+    return sum + (ts.completed ? ts.finalScore : 0);
+  }, 0);
+
+  const traversalScore = traversalTasks.reduce((sum, t) => {
+    const ts = progressManager.getGameTaskState(t.taskId);
+    return sum + (ts.completed ? ts.finalScore : 0);
+  }, 0);
+
+  const quizQuestionRecords = progressManager.getAllQuizQuestions();
+
   const categories = [
-    {
-      id: 'learn' as const,
-      name: 'Learn',
-      tab: 'THEORY' as MainViewTab,
-      score: learnScore,
-      max: 25,
-      icon: BookOpen,
-      color: 'blue',
-      description: '15 structured foundational theory chapters & interactive examples',
-      badgeClass: 'bg-blue-50 dark:bg-blue-950/50 text-[#2563EB] dark:text-blue-300 border-blue-200 dark:border-blue-900/40',
-      barGradient: 'from-blue-600 to-indigo-600',
-    },
     {
       id: 'visualize' as const,
       name: 'Visualize',
       tab: 'VIDEO' as MainViewTab,
       score: visualizeScore,
-      max: 15,
+      max: 10,
       icon: Eye,
       color: 'cyan',
-      description: '5 interactive dynamic memory & pointer visualization stages',
+      description: '2 concept videos: SLL Fundamentals & Pointer Mechanics (5 pts each)',
       badgeClass: 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900/40',
       barGradient: 'from-cyan-500 to-blue-600',
     },
@@ -72,10 +95,10 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
       name: 'Game',
       tab: 'GAME' as MainViewTab,
       score: gameScore,
-      max: 40,
+      max: 60,
       icon: Gamepad2,
       color: 'emerald',
-      description: '3 interactive pointer manipulation games: Insertion, Deletion, Traversal',
+      description: '3 interactive levels: Insertion (25 pts), Deletion (25 pts), Traversal (10 pts)',
       badgeClass: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/40',
       barGradient: 'from-emerald-500 to-teal-600',
     },
@@ -84,12 +107,24 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
       name: 'Quiz',
       tab: 'QUIZ' as MainViewTab,
       score: quizScore,
-      max: 20,
+      max: 30,
       icon: HelpCircle,
       color: 'amber',
-      description: 'Comprehensive 20-point assessment testing all SLL concepts',
+      description: '10 questions: +3 correct, −1 wrong, 0 timeout (30 pts max)',
       badgeClass: 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-300 border-amber-200 dark:border-amber-900/40',
       barGradient: 'from-amber-500 to-orange-500',
+    },
+    {
+      id: 'learn' as const,
+      name: 'Learn (Theory)',
+      tab: 'THEORY' as MainViewTab,
+      score: 0,
+      max: 0,
+      icon: BookOpen,
+      color: 'blue',
+      description: '15 foundational theory chapters (Learn section awards 0 pts)',
+      badgeClass: 'bg-blue-50 dark:bg-blue-950/50 text-[#2563EB] dark:text-blue-300 border-blue-200 dark:border-blue-900/40',
+      barGradient: 'from-blue-600 to-indigo-600',
     },
   ];
 
@@ -107,19 +142,6 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
               Live Real-Time Sync
             </span>
           </div>
-
-          {onResetProgress && (
-            <button
-              onClick={() => {
-                soundManager.playModalOpen();
-                onResetProgress();
-              }}
-              className="text-xs font-medium text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Progress</span>
-            </button>
-          )}
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-3">
@@ -128,7 +150,7 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
               Points System
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-xl">
-              Real-time earned score across all Single Linked List modules. 100 points total.
+              Real-time earned score across all Singly Linked List modules. 100 points maximum.
             </p>
           </div>
 
@@ -185,7 +207,7 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
               <span className="text-2xl sm:text-3xl font-extrabold font-mono text-[#2563EB] dark:text-blue-400">
                 {percentage}%
               </span>
-              <span className="text-xs text-slate-400 block font-mono">Complete</span>
+              <span className="text-xs text-slate-400 block font-mono">Curriculum Complete</span>
             </div>
           </div>
 
@@ -234,18 +256,23 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
           <div className="flex items-center gap-2">
             <Award className="w-4 h-4 text-[#2563EB] dark:text-blue-400" />
             <h2 className="text-sm sm:text-base font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 font-mono">
-              POINT BREAKDOWN
+              POINT BREAKDOWN (100 PTS MAXIMUM)
             </h2>
           </div>
           <span className="text-xs font-mono text-slate-400">
-            Total Target: 100 Points
+            Target: 100 Points
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {categories.map((cat) => {
             const Icon = cat.icon;
-            const catPercent = Math.round((cat.score / cat.max) * 100);
+            const catPercent =
+              cat.max > 0
+                ? Math.min(100, Math.max(0, Math.round((cat.score / cat.max) * 100)))
+                : Math.round(
+                    (Object.keys(state.completedActivities).filter((id) => id.startsWith('learn-')).length / 15) * 100
+                  );
 
             return (
               <div
@@ -264,10 +291,18 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
                     </div>
 
                     <div className="flex items-baseline gap-1 font-mono font-bold">
-                      <span className="text-xl text-slate-900 dark:text-white">
-                        {cat.score}
-                      </span>
-                      <span className="text-xs text-slate-400">/ {cat.max}</span>
+                      {cat.max > 0 ? (
+                        <>
+                          <span className="text-xl text-slate-900 dark:text-white">
+                            {cat.score}
+                          </span>
+                          <span className="text-xs text-slate-400">/ {cat.max}</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-normal">
+                          0 pts
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -287,7 +322,7 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-blue-900/20 text-xs">
                     <span className="text-[11px] font-mono text-slate-400">
-                      {catPercent}% of section completed
+                      {cat.max > 0 ? `${catPercent}% of section` : `${catPercent}% lessons completed`}
                     </span>
 
                     <button
@@ -319,7 +354,7 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
                 TOTAL MODULE SCORE
               </span>
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Learn ({learnScore}/25) + Visualize ({visualizeScore}/15) + Game ({gameScore}/40) + Quiz ({quizScore}/20)
+                Visualization ({visualizeScore}/10) + Game ({gameScore}/60) + Quiz ({quizScore}/30)
               </span>
             </div>
           </div>
@@ -345,13 +380,262 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
         </div>
 
         <div className="space-y-6">
-          {/* Section A: Learn (15 activities) */}
+          {/* Section A: Visualization (2 videos, 5 pts each = 10 pts) */}
+          <div>
+            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 mb-2">
+              <span className="uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+                1. Visualization Videos ({visualizeScore} / 10 pts)
+              </span>
+              <span>2 Videos (5 pts each)</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {VISUALIZE_ACTIVITIES.map((act, idx) => {
+                const isDone = progressManager.isCompleted(act.id);
+                return (
+                  <div
+                    key={act.id}
+                    onClick={() => onNavigateToTab('VIDEO')}
+                    className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                      isDone
+                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
+                        : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20 text-slate-600 dark:text-slate-400 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <div className="p-1.5 rounded-lg bg-cyan-100 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-300">
+                        <Eye className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold truncate">Video {idx + 1}: {act.title}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {isDone ? 'Completed • Reward Claimed' : 'Watch video in full to earn points'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`font-mono font-bold shrink-0 text-xs px-2.5 py-1 rounded-md ${
+                        isDone
+                          ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-cyan-100/70 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300'
+                      }`}
+                    >
+                      {isDone ? '✓ 5 pts' : '+5 pts'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section B: Game Levels (Insertion 25 pts, Deletion 25 pts, Traversal 10 pts = 60 pts) */}
+          <div>
+            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 mb-2">
+              <span className="uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                2. Game Levels ({gameScore} / 60 pts)
+              </span>
+              <span>3 Levels • Insertion (25) • Deletion (25) • Traversal (10)</span>
+            </div>
+
+            {/* Game Levels Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+              <div
+                onClick={() => onNavigateToTab('GAME')}
+                className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                  insertionDone
+                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
+                    : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold">Insertion Level</span>
+                  <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
+                    {insertionScore} / 25 pts
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  Status: {insertionDone ? '✓ Completed' : 'In Progress'}
+                </div>
+              </div>
+
+              <div
+                onClick={() => onNavigateToTab('GAME')}
+                className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                  deletionDone
+                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
+                    : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold">Deletion Level</span>
+                  <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
+                    {deletionScore} / 25 pts
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  Status: {deletionDone ? '✓ Completed' : 'In Progress'}
+                </div>
+              </div>
+
+              <div
+                onClick={() => onNavigateToTab('GAME')}
+                className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                  traversalDone
+                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
+                    : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold">Traversal Level</span>
+                  <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
+                    {traversalScore} / 10 pts
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  Status: {traversalDone ? '✓ Completed' : 'In Progress'}
+                </div>
+              </div>
+            </div>
+
+            {/* Individual Game Tasks Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              {GAME_TASK_LIST.map((game) => {
+                const taskState = progressManager.getGameTaskState(game.taskId);
+                const isDone = taskState.completed || progressManager.isCompleted(game.taskId);
+                const earned = taskState.completed ? taskState.finalScore : 0;
+                return (
+                  <div
+                    key={game.taskId}
+                    onClick={() => onNavigateToTab('GAME')}
+                    className={`p-2.5 rounded-xl border text-xs flex flex-col justify-between gap-1.5 cursor-pointer transition-all ${
+                      isDone
+                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
+                        : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20 text-slate-600 dark:text-slate-400 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-xs truncate">{game.title}</span>
+                      <span
+                        className={`font-mono font-bold text-[11px] px-1.5 py-0.5 rounded-md shrink-0 ${
+                          isDone
+                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500'
+                        }`}
+                      >
+                        {isDone ? `✓ +${earned} pts` : `${game.baseScore} pts`}
+                      </span>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 flex items-center justify-between font-mono">
+                      <span className="capitalize">{game.category}</span>
+                      {isDone && (taskState.hintUsed || taskState.guideUsed) && (
+                        <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                          {taskState.hintUsed ? 'Hint (-2) ' : ''}
+                          {taskState.guideUsed ? 'Guide (-3)' : ''}
+                        </span>
+                      )}
+                      {!isDone && <span>Reward: {game.baseScore} pts</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section C: Quiz Assessment (10 questions, +3, -1, 0, 30 pts max) */}
+          <div>
+            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 mb-2">
+              <span className="uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                3. Quiz Assessment Questions ({quizScore} / 30 pts)
+              </span>
+              <span>10 Questions • +3 Correct • −1 Wrong • 0 Timeout</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+              {QUIZ_QUESTIONS.map((q, idx) => {
+                const record = quizQuestionRecords[q.id];
+                const status = record ? record.status : 'unanswered';
+                const pts = record ? record.points : 0;
+
+                return (
+                  <div
+                    key={q.id}
+                    onClick={() => onNavigateToTab('QUIZ')}
+                    className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex flex-col justify-between gap-1.5 ${
+                      status === 'correct'
+                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40'
+                        : status === 'wrong'
+                        ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40'
+                        : status === 'timeout'
+                        ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40'
+                        : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-[11px] text-slate-600 dark:text-slate-300">
+                        Q{idx + 1}
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                          status === 'correct'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : status === 'wrong'
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                            : status === 'timeout'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                            : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                        }`}
+                      >
+                        {status === 'correct'
+                          ? '+3 pts'
+                          : status === 'wrong'
+                          ? '−1 pt'
+                          : status === 'timeout'
+                          ? '0 pts'
+                          : 'Pending'}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] font-medium truncate text-slate-800 dark:text-slate-200" title={q.question}>
+                      {q.question}
+                    </div>
+
+                    <div className="text-[10px] font-mono capitalize">
+                      {status === 'correct' && (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Correct
+                        </span>
+                      )}
+                      {status === 'wrong' && (
+                        <span className="text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1">
+                          <XCircle className="w-3 h-3" /> Incorrect
+                        </span>
+                      )}
+                      {status === 'timeout' && (
+                        <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Timed Out
+                        </span>
+                      )}
+                      {status === 'unanswered' && (
+                        <span className="text-slate-400 flex items-center gap-1">
+                          <Circle className="w-3 h-3" /> Unanswered
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section D: Learn (15 theory lessons, 0 pts) */}
           <div>
             <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 mb-2">
               <span className="uppercase tracking-wider text-[#2563EB] dark:text-blue-400">
-                1. Learn Section Activities ({learnScore} / 25 pts)
+                4. Learn Section Topics (15 Chapters • 0 pts)
               </span>
-              <span>15 Topics</span>
+              <span>Theory Content Only</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -375,144 +659,17 @@ export const PointsView: React.FC<PointsViewProps> = ({ onNavigateToTab, onReset
                     </div>
 
                     <span
-                      className={`font-mono font-bold shrink-0 text-[11px] px-1.5 py-0.5 rounded-md ${
+                      className={`font-mono font-bold shrink-0 text-[10px] px-1.5 py-0.5 rounded-md ${
                         isDone
                           ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
                           : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500'
                       }`}
                     >
-                      {isDone ? `✓ +${act.points}` : `${act.points} pt`}
+                      {isDone ? '✓ Completed' : 'In Progress'}
                     </span>
                   </div>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Section B: Visualize (5 activities) */}
-          <div>
-            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 mb-2">
-              <span className="uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-                2. Visualize Section Activities ({visualizeScore} / 15 pts)
-              </span>
-              <span>5 Activities (3 pts each)</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {VISUALIZE_ACTIVITIES.map((act) => {
-                const isDone = progressManager.isCompleted(act.id);
-                return (
-                  <div
-                    key={act.id}
-                    onClick={() => onNavigateToTab('VIDEO')}
-                    className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 cursor-pointer transition-all ${
-                      isDone
-                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
-                        : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20 text-slate-600 dark:text-slate-400 hover:border-blue-300'
-                    }`}
-                  >
-                    <span className="truncate font-medium">{act.title}</span>
-                    <span
-                      className={`font-mono font-bold shrink-0 text-[11px] px-1.5 py-0.5 rounded-md ${
-                        isDone
-                          ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500'
-                      }`}
-                    >
-                      {isDone ? `✓ +${act.points}` : `${act.points} pts`}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Section C: Game (8 tasks, 40 pts total) */}
-          <div>
-            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 mb-2">
-              <span className="uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                3. Game Tasks ({gameScore} / 40 pts)
-              </span>
-              <span>8 Tasks • Insertion (15) • Deletion (15) • Traversal (10)</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-              {GAME_TASK_LIST.map((game) => {
-                const taskState = progressManager.getGameTaskState(game.taskId);
-                const isDone = taskState.completed || progressManager.isCompleted(game.taskId);
-                const earned = taskState.completed ? taskState.finalScore : 0;
-                return (
-                  <div
-                    key={game.taskId}
-                    onClick={() => onNavigateToTab('GAME')}
-                    className={`p-3 rounded-xl border text-xs flex flex-col justify-between gap-2 cursor-pointer transition-all ${
-                      isDone
-                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
-                        : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20 text-slate-600 dark:text-slate-400 hover:border-blue-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-bold text-xs truncate">{game.title}</span>
-                      <span
-                        className={`font-mono font-bold text-[11px] px-1.5 py-0.5 rounded-md shrink-0 ${
-                          isDone
-                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500'
-                        }`}
-                      >
-                        {isDone ? `✓ +${earned} pts` : `${game.baseScore} pts`}
-                      </span>
-                    </div>
-
-                    <div className="text-[10px] text-slate-400 flex items-center justify-between font-mono">
-                      <span className="capitalize">{game.category}</span>
-                      {isDone && (taskState.hintUsed || taskState.guideUsed) && (
-                        <span className="text-amber-600 dark:text-amber-400">
-                          {taskState.hintUsed ? 'Hint (-2) ' : ''}
-                          {taskState.guideUsed ? 'Guide (-3)' : ''}
-                        </span>
-                      )}
-                      {!isDone && <span>Base: {game.baseScore} XP</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Section D: Quiz (20 pts) */}
-          <div>
-            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 mb-2">
-              <span className="uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                4. Quiz Assessment ({quizScore} / 20 pts)
-              </span>
-              <span>1 Final Quiz Module</span>
-            </div>
-
-            <div
-              onClick={() => onNavigateToTab('QUIZ')}
-              className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-3 cursor-pointer transition-all ${
-                quizScore > 0
-                  ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200'
-                  : 'bg-slate-50 dark:bg-[#080D1F] border-slate-200/80 dark:border-blue-900/20 text-slate-600 dark:text-slate-400 hover:border-blue-300'
-              }`}
-            >
-              <div>
-                <span className="font-bold text-sm block">Comprehensive SLL Quiz</span>
-                <span className="text-[11px] text-slate-400">
-                  Tests definition, node structure, pointers, operations, time complexities, advantages & applications
-                </span>
-              </div>
-
-              <span
-                className={`font-mono font-bold text-xs px-2.5 py-1 rounded-md shrink-0 ${
-                  quizScore > 0
-                    ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
-                    : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500'
-                }`}
-              >
-                {quizScore > 0 ? `${quizScore} / 20 pts` : '20 pts max'}
-              </span>
             </div>
           </div>
         </div>

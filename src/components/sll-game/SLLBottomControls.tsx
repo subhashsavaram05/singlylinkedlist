@@ -25,7 +25,7 @@ interface SLLBottomControlsProps {
   onUndo: () => void;
   onRedo: () => void;
   onResetTask: () => void;
-  onOpenHint: () => void;
+  onOpenHint?: () => void;
   onOpenHowToPlay?: () => void;
   canUndo: boolean;
   canRedo: boolean;
@@ -37,6 +37,8 @@ interface SLLBottomControlsProps {
   onToggleSetTailMode?: () => void;
   onCancelDirectMode?: () => void;
   assistanceMode?: AssistanceMode;
+  isGuidedSolveActive?: boolean;
+  isTaskComplete?: boolean;
   currentStep?: number;
   task?: SLLTaskDef;
   nodes?: SLLNode[];
@@ -65,6 +67,8 @@ export const SLLBottomControls: React.FC<SLLBottomControlsProps> = ({
   onToggleSetTailMode,
   onCancelDirectMode,
   assistanceMode = 'play',
+  isGuidedSolveActive = false,
+  isTaskComplete = false,
   currentStep = 1,
   task,
   nodes = [],
@@ -103,17 +107,22 @@ export const SLLBottomControls: React.FC<SLLBottomControlsProps> = ({
 
       {/* Main Controls Card */}
       <div className="w-full bg-white dark:bg-[#0B1228] border border-slate-200 dark:border-blue-900/30 rounded-3xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-2.5 font-sans">
-        {/* Left Side: Contextual Controls in PLAY mode OR Teacher trigger in GUIDE & SOLVE */}
+        {/* Left Side: Contextual Controls in PLAY mode OR NEXT STEP in Guided solve flow */}
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {assistanceMode === 'guide_solve' || assistanceMode === 'guide' ? (
-            /* GUIDE & SOLVE MODE: Perform one step */
+          {isGuidedSolveActive ? (
+            /* GUIDED SOLVE FLOW: NEXT STEP (executes next step with 0 points deducted) */
             <button
               id="guide-solve-bottom-btn"
               onClick={onExecuteTeacherStep}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFF3E0] hover:bg-[#FFE7C4] dark:bg-[#2A1D0D] dark:hover:bg-[#382611] border-2 border-[#FDBA5A] text-[#7C3F00] dark:text-[#FDBA5A] text-xs font-bold shadow-xs cursor-pointer transition-all hover:scale-105"
+              disabled={isTaskComplete}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFF3E0] dark:bg-[#2A1D0D] border-2 border-[#FDBA5A] text-[#7C3F00] dark:text-[#FDBA5A] text-xs font-bold shadow-xs transition-all ${
+                isTaskComplete
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-[#FFE7C4] dark:hover:bg-[#382611] cursor-pointer hover:scale-105 active:scale-95'
+              }`}
             >
               <Zap className="w-4 h-4 fill-[#F59E0B] text-[#F59E0B]" />
-              <span>Perform Step {currentStep}</span>
+              <span>{isTaskComplete ? 'ALL STEPS COMPLETED' : 'NEXT STEP'}</span>
             </button>
           ) : (
             /* Workspace clear status indication */
@@ -125,7 +134,7 @@ export const SLLBottomControls: React.FC<SLLBottomControlsProps> = ({
           )}
         </div>
 
-        {/* Right Side: Undo, Redo, Reset, Hint, How to Play */}
+        {/* Right Side: Undo, Redo, How to Play */}
         <div className="flex items-center gap-1.5">
           <button
             onClick={onUndo}
@@ -143,23 +152,6 @@ export const SLLBottomControls: React.FC<SLLBottomControlsProps> = ({
             className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 hover:bg-slate-200 text-xs font-bold transition-colors cursor-pointer"
           >
             <Redo2 className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={onResetTask}
-            title="Reset task to initial state"
-            className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 text-xs font-bold transition-colors cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Reset</span>
-          </button>
-
-          <button
-            onClick={onOpenHint}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 transition-colors cursor-pointer"
-          >
-            <Lightbulb className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Hint</span>
           </button>
 
           {onOpenHowToPlay && (

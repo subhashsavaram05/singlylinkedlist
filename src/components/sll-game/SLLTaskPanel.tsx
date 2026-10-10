@@ -33,7 +33,7 @@ interface SLLTaskPanelProps {
   onOpenSetHead: () => void;
   onOpenSetTail: () => void;
   onOpenDeleteNode: (address?: number) => void;
-  onOpenHint: () => void;
+  onOpenHint?: () => void;
   onCheckAnswer: () => void;
   onOpenHowItWorks?: () => void;
   assistanceMode?: AssistanceMode;
@@ -136,15 +136,6 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
                 <span>Concept</span>
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={onOpenHint}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 transition-colors cursor-pointer"
-            >
-              <Lightbulb className="w-3.5 h-3.5" />
-              <span>Hint</span>
-            </button>
           </div>
         </div>
 

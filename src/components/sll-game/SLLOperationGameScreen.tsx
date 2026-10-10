@@ -104,6 +104,46 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
 
   // Assistance Mode: 'guide_solve' | 'play'
   const [assistanceMode, setAssistanceMode] = useState<AssistanceMode>('guide_solve');
+  const [isGuidedSolveActive, setIsGuidedSolveActive] = useState<boolean>(false);
+  const [displayScore, setDisplayScore] = useState<number>(() => progressManager.getTotalPoints());
+
+  useEffect(() => {
+    setDisplayScore(totalScore);
+  }, [totalScore]);
+
+  useEffect(() => {
+    const unsub = progressManager.subscribe((state) => {
+      setDisplayScore(state.totalPoints);
+    });
+    return () => unsub();
+  }, []);
+
+  // Floating Point Deduction Toast (Guided Solve / Hint)
+  const [deductionToast, setDeductionToast] = useState<{
+    id: number;
+    points: number;
+    reason: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const unsub = progressManager.onPointDeduction((notif) => {
+      setDeductionToast({
+        id: notif.id,
+        points: notif.points,
+        reason: notif.reason,
+      });
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!deductionToast) return;
+    const timer = setTimeout(() => {
+      setDeductionToast(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [deductionToast]);
+
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [taskStatus, setTaskStatus] = useState<'in_progress' | 'completed'>('in_progress');
@@ -180,6 +220,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     setTaskStatus('in_progress');
     setIsCompleted(false);
     setTeacherLastActionResult(null);
+    setIsGuidedSolveActive(false);
     setHistory([]);
     setRedoStack([]);
 
@@ -236,6 +277,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     setIsCompleted(false);
     setHintLevel(0);
     setTeacherLastActionResult(null);
+    setIsGuidedSolveActive(false);
     setCurrentStep(1);
     setCompletedSteps([]);
     setTaskStatus('in_progress');
@@ -713,12 +755,10 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     }
   };
 
-  // Assistance Mode switcher: GUIDE & SOLVE vs PLAY
+  // Assistance Mode switcher: Concept vs Workspace
   const handleSelectAssistanceMode = (mode: AssistanceMode) => {
     soundManager.play('click');
-    if (mode === 'guide_solve' || mode === 'guide') {
-      progressManager.recordGameTaskAssistance(taskId, 'guide');
-    } else if (mode === 'concept') {
+    if (mode === 'concept') {
       progressManager.recordGameTaskAssistance(taskId, 'concept');
     }
     if (mode === 'play') {
@@ -920,6 +960,23 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
       });
     }
   };
+
+  // GUIDEDSOLVE: Deducts 3 points on every activation, enables NEXT STEP flow, executes exactly ONE step
+  const handleGuidedSolveClick = () => {
+    if (taskStatus === 'completed' || isCompleted) return;
+    soundManager.play('click');
+    progressManager.deductGuidedSolvePoints(taskId);
+    setIsGuidedSolveActive(true);
+    handleExecuteTeacherStep();
+  };
+
+  // NEXT STEP: Executes exactly ONE guided step with 0 points deducted
+  const handleNextStepClick = () => {
+    if (taskStatus === 'completed' || isCompleted) return;
+    soundManager.play('step');
+    handleExecuteTeacherStep();
+  };
+
   const handleSearchAnswer = (isMatchAnswer: boolean) => {
     if (!currentSearchNode) return;
     const target = 40;
@@ -986,7 +1043,51 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   const selectedNode = nodes.find((n) => n.address === selectedAddress) || null;
 
   return (
-    <div className="flex flex-col gap-5 max-w-7xl mx-auto w-full font-sans animate-chapter-switch">
+    <div className="flex flex-col gap-5 max-w-7xl mx-auto w-full font-sans animate-chapter-switch relative">
+      {/* Floating Point Deduction Toast (Matching Reference Image) */}
+      <div className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex justify-center w-full px-4 max-w-md">
+        <AnimatePresence>
+          {deductionToast && (
+            <motion.div
+              key={deductionToast.id}
+              initial={{ opacity: 0, y: -16, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.95 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="pointer-events-auto"
+            >
+              <div className="bg-white dark:bg-[#0E172E] border border-rose-200/90 dark:border-rose-900/50 rounded-2xl sm:rounded-3xl px-4 py-3 sm:px-5 sm:py-3.5 shadow-[0_10px_35px_rgba(244,63,94,0.16)] flex items-center gap-3 sm:gap-3.5 font-sans backdrop-blur-md">
+                {/* Exclamation badge */}
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-rose-50 dark:bg-rose-950/70 border border-rose-200/80 dark:border-rose-900/50 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 stroke-[2.2]" />
+                </div>
+
+                {/* Deduction & Reason */}
+                <div className="flex items-center gap-2">
+                  <span className="text-base sm:text-lg font-extrabold text-rose-600 dark:text-rose-400 font-sans tracking-tight whitespace-nowrap">
+                    -{deductionToast.points} Points
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600 font-bold">—</span>
+                  <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 font-sans whitespace-nowrap">
+                    {deductionToast.reason}
+                  </span>
+                </div>
+
+                {/* Dismiss Button */}
+                <button
+                  type="button"
+                  onClick={() => setDeductionToast(null)}
+                  className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition-colors cursor-pointer"
+                  title="Dismiss notification"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* 1. TOP HEADER HUD */}
       <div className="bg-white dark:bg-[#0B1228] border border-slate-200 dark:border-blue-900/30 rounded-3xl p-4 sm:p-5 shadow-xs flex flex-wrap items-center justify-between gap-3">
         {/* Left: Back & Title */}
@@ -1013,40 +1114,22 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
           </div>
         </div>
 
-        {/* Center: Assistance Mode Switcher (Guide & Solve, Concept, Play) */}
+        {/* Center: Concept Reference Toggle */}
         <div className="flex items-center gap-2">
-          {/* Segmented Mode Switcher: GUIDE & SOLVE | CONCEPT */}
-          <div className="flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-[#070B19] border border-slate-200 dark:border-blue-900/20 text-xs font-bold shadow-2xs">
-            <button
-              type="button"
-              id="mode-guide-solve-btn"
-              onClick={() => handleSelectAssistanceMode('guide_solve')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${
-                assistanceMode === 'guide_solve' || assistanceMode === 'guide'
-                  ? 'bg-[#FFF3E0] dark:bg-[#2A1D0D] border border-[#FDBA5A] dark:border-[#FDBA5A]/60 text-[#7C3F00] dark:text-[#FDBA5A] font-bold shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-transparent'
-              }`}
-              title="Guide & Solve: Teaching instructions and step-by-step guidance"
-            >
-              <Lightbulb className="w-3.5 h-3.5 text-[#F59E0B] fill-[#F59E0B]" />
-              <span>GUIDE & SOLVE</span>
-            </button>
-
-            <button
-              type="button"
-              id="sll-concept-btn"
-              onClick={() => handleSelectAssistanceMode('concept')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${
-                assistanceMode === 'concept'
-                  ? 'bg-[#2563EB] text-white font-bold shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-transparent'
-              }`}
-              title="Concept: Current Objective, Pointer Tools info, Pointer Rule, RAM Memory State"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>CONCEPT</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            id="sll-concept-btn"
+            onClick={() => handleSelectAssistanceMode(assistanceMode === 'concept' ? 'guide_solve' : 'concept')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl transition-all cursor-pointer font-bold text-xs ${
+              assistanceMode === 'concept'
+                ? 'bg-[#2563EB] text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-[#070B19] border border-slate-200 dark:border-blue-900/20 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-2xs'
+            }`}
+            title="Concept: Current Objective, Pointer Tools info, Pointer Rule, RAM Memory State"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>CONCEPT</span>
+          </button>
 
           {/* Level 5 Master Mission Board Button */}
           {currentLevelId === 5 && (
@@ -1074,7 +1157,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#070B19] border border-slate-200 dark:border-blue-900/20 text-amber-600 font-bold">
             <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-            <span>{totalScore} XP</span>
+            <span>{displayScore} XP</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#070B19] border border-slate-200 dark:border-blue-900/20 text-slate-600 dark:text-slate-400 font-bold">
@@ -1112,10 +1195,10 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
               <button
                 type="button"
                 onClick={() => handleSelectAssistanceMode('guide_solve')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FFF3E0] hover:bg-[#FFE8C2] dark:bg-[#2A1D0D] dark:hover:bg-[#382611] border-2 border-[#FDBA5A] text-[#7C3F00] dark:text-[#FDBA5A] text-xs font-bold shadow-xs cursor-pointer transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
               >
-                <Lightbulb className="w-3.5 h-3.5 text-[#F59E0B] fill-[#F59E0B]" />
-                <span>Guide & Solve</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Workspace</span>
               </button>
             </div>
           </div>
@@ -1220,17 +1303,15 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
           {/* Left Column: Interactive RAM Workspace + Teacher Assistant + Bottom Controls */}
           <div className="lg:col-span-8 flex flex-col gap-4">
             {/* GUIDE & SOLVE TEACHER BANNER: Teaches step & performs ONE step */}
-            {(assistanceMode === 'guide_solve' || assistanceMode === 'guide') && (
             <SLLTeacherBanner
               step={currentTeacherStep}
               lastActionResult={teacherLastActionResult}
-              onExecuteStep={handleExecuteTeacherStep}
+              onExecuteStep={handleGuidedSolveClick}
               isTaskComplete={isCompleted || taskStatus === 'completed'}
               completedSteps={completedSteps}
               onNextTask={handleNextTaskClick}
               hasNextTask={Boolean(nextTaskId)}
             />
-          )}
 
           {/* DYNAMIC POSITION SELECTOR FOR L4_T2 ("Delete at Any Position") */}
           {activeTask.id === 'L4_T2' && (
@@ -1337,11 +1418,13 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
               setPendingConnectFrom(null);
             }}
             assistanceMode={assistanceMode}
+            isGuidedSolveActive={isGuidedSolveActive}
+            isTaskComplete={isCompleted || taskStatus === 'completed'}
             currentStep={currentStep}
             task={activeTask}
             nodes={nodes}
             pointers={pointers}
-            onExecuteTeacherStep={handleExecuteTeacherStep}
+            onExecuteTeacherStep={handleNextStepClick}
           />
         </div>
 

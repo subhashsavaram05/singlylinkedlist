@@ -342,7 +342,7 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
           </div>
           <div>
             <span className="text-[10px] font-mono font-bold tracking-widest text-cyan-400 uppercase block">
-              VISUALIZATION LAB • 15 POINTS
+              VISUALIZATION LAB • CONCEPT ANIMATION
             </span>
             <h3 className="text-sm sm:text-base font-extrabold text-white">
               Single Linked List Interactive Visualizer
@@ -721,15 +721,7 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleReset}
-                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-xs font-semibold text-slate-400 hover:text-slate-200 border border-slate-700/60 flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset</span>
-              </button>
-            </div>
+
           </div>
         </div>
       </div>

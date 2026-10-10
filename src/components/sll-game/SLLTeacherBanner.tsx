@@ -160,7 +160,7 @@ export const SLLTeacherBanner: React.FC<SLLTeacherBannerProps> = ({
               className="py-2.5 px-4 rounded-2xl bg-[#FFF3E0] hover:bg-[#FFE7C4] dark:bg-[#2A1D0D] dark:hover:bg-[#382611] border-2 border-[#FDBA5A] text-[#7C3F00] dark:text-[#FDBA5A] font-bold text-xs shadow-xs flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 active:scale-95"
             >
               <Zap className="w-4 h-4 fill-[#F59E0B] text-[#F59E0B]" />
-              <span>GUIDE & SOLVE: Perform Step {step.stepNumber}</span>
+              <span>GUIDEDSOLVE</span>
             </button>
 
             <span className="text-[11px] text-[#7C3F00]/90 dark:text-[#FDBA5A]/90 font-medium">
