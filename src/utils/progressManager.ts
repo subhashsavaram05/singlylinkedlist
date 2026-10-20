@@ -225,6 +225,7 @@ export interface QuizSessionState {
   timeLeft: number;
   isSubmitted: boolean;
   studentAnswers: Record<number, any>;
+  shuffledOptions?: Record<number, string[]>;
 }
 
 export interface CentralizedProgressState {
@@ -656,6 +657,23 @@ class ProgressManager {
     return { newlyCompleted: awarded, pointsAwarded: awarded ? act.points : 0 };
   }
 
+  /**
+   * Complete an Interactive Visualizer activity.
+   * Tracks completion for UI state, but awards ZERO (0) points.
+   * The interactive visualizer is purely for learning and does NOT award score or XP.
+   */
+  public completeInteractiveVisualizerActivity(activityId: string): { newlyCompleted: boolean; pointsAwarded: number } {
+    if (this.isCompleted(activityId)) {
+      return { newlyCompleted: false, pointsAwarded: 0 };
+    }
+
+    const awarded = this.markCompleted(activityId, 'visualize', 0, {
+      title: activityId,
+      type: 'interactive_visualizer',
+    });
+    return { newlyCompleted: awarded, pointsAwarded: 0 };
+  }
+
   // =========================================================================
   // GAME ASSISTANCE & PENALTY ENGINE
   // =========================================================================
@@ -720,9 +738,11 @@ class ProgressManager {
       task.hintCount = (task.hintCount || 0) + 1;
       task.hintPenalty = task.hintCount * 2;
     } else if (type === 'guide') {
-      task.guideUsed = true;
-      task.guideCount = (task.guideCount || 0) + 1;
-      task.guidePenalty = task.guideCount * 3;
+      if (!task.guideUsed) {
+        task.guideUsed = true;
+        task.guideCount = 1;
+        task.guidePenalty = 3;
+      }
     } else if (type === 'concept') {
       task.conceptUsed = true;
     }
@@ -735,7 +755,7 @@ class ProgressManager {
       this.state.gameAssistance[canonical].hintCount = task.hintCount;
     } else if (type === 'guide') {
       this.state.gameAssistance[canonical].guideUsed = true;
-      this.state.gameAssistance[canonical].guideCount = task.guideCount;
+      this.state.gameAssistance[canonical].guideCount = 1;
     }
 
     this.recalculateScores();
@@ -748,12 +768,39 @@ class ProgressManager {
 
   /**
    * Explicit GUIDEDSOLVE point deduction:
-   * Deducts 3 points from user total points on every activation, including repeated clicks in same level.
+   * Deducts configured 3 points exactly once when a new Guided Solve session begins.
+   * Never deducts points for individual Next Step clicks, rerenders, or session completion.
+   * Activating Guided Solve again after stopping counts as a new session.
    */
-  public deductGuidedSolvePoints(taskId: string): number {
-    this.recordGameTaskAssistance(taskId, 'guide');
+  public startGuidedSolveSession(taskId: string): number {
+    const canonical = toCanonicalGameTaskId(taskId);
+    const task = this.getGameTaskState(canonical);
+
+    task.guideUsed = true;
+    task.guideCount = (task.guideCount || 0) + 1;
+    task.guidePenalty = task.guideCount * 3;
+
+    if (!this.state.gameAssistance[canonical]) {
+      this.state.gameAssistance[canonical] = { hintUsed: false, guideUsed: true, attempts: 1, hintCount: 0, guideCount: task.guideCount };
+    } else {
+      this.state.gameAssistance[canonical].guideUsed = true;
+      this.state.gameAssistance[canonical].guideCount = task.guideCount;
+    }
+
+    this.recalculateScores();
+    this.saveState();
     this.emitPointDeduction(3, 'Guided Solve Used');
     return this.getTotalPoints();
+  }
+
+  public deductGuidedSolvePoints(taskId: string): number {
+    return this.startGuidedSolveSession(taskId);
+  }
+
+  public isGuidedSolveUsed(taskId: string): boolean {
+    const canonical = toCanonicalGameTaskId(taskId);
+    const task = this.getGameTaskState(canonical);
+    return Boolean(task.guideUsed);
   }
 
   public deductHintPoints(taskId: string): number {

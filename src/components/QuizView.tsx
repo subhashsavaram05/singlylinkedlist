@@ -18,7 +18,6 @@ import {
   Trophy,
   Home,
   Play,
-  RotateCcw,
   Clock,
 } from 'lucide-react';
 import { progressManager } from '../utils/progressManager';
@@ -235,6 +234,78 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   },
 ];
 
+/**
+ * Standard Fisher-Yates (Knuth) shuffle algorithm.
+ * Returns a new shuffled copy of the array without mutating the input.
+ */
+export function fisherYatesShuffle<T>(array: readonly T[]): T[] {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = temp;
+  }
+  return copy;
+}
+
+/**
+ * Generates an independently shuffled set of options for each question
+ * with a balanced distribution of correct answers across option slots (A, B, C, D).
+ * Never mutates the original question bank.
+ */
+export function generateShuffledOptions(
+  questions: QuizQuestion[]
+): Record<number, string[]> {
+  const result: Record<number, string[]> = {};
+  const total = questions.length;
+
+  // Build a balanced list of target slots for correct answers across the questions (0=A, 1=B, 2=C, 3=D).
+  // E.g., for 10 questions: [0, 1, 2, 3, 0, 1, 2, 3, 0, 1]
+  const targetSlots: number[] = [];
+  for (let i = 0; i < total; i++) {
+    targetSlots.push(i % 4);
+  }
+  // Shuffle the target slots using Fisher-Yates so their assignment to questions is randomized
+  const randomizedSlots = fisherYatesShuffle(targetSlots);
+
+  questions.forEach((q, idx) => {
+    const numOptions = q.options.length;
+    if (numOptions <= 1) {
+      result[q.id] = [...q.options];
+      return;
+    }
+
+    // Determine the target slot for this question's correct answer
+    const assignedSlot =
+      randomizedSlots[idx] !== undefined
+        ? randomizedSlots[idx] % numOptions
+        : Math.floor(Math.random() * numOptions);
+
+    const correctText = q.correctAnswerText;
+    // Extract distractors (all options except the correct answer)
+    const distractors = q.options.filter((opt) => opt !== correctText);
+
+    // Shuffle the distractors independently using Fisher-Yates
+    const shuffledDistractors = fisherYatesShuffle(distractors);
+
+    // Assemble the options array with the correct answer placed at assignedSlot
+    const shuffled: string[] = new Array(numOptions);
+    shuffled[assignedSlot] = correctText;
+
+    let distractorIdx = 0;
+    for (let slot = 0; slot < numOptions; slot++) {
+      if (slot !== assignedSlot) {
+        shuffled[slot] = shuffledDistractors[distractorIdx++];
+      }
+    }
+
+    result[q.id] = shuffled;
+  });
+
+  return result;
+}
+
 export const QuizView: React.FC<QuizViewProps> = ({
   onNavigateToTheory,
   onNavigateToQuest,
@@ -242,6 +313,25 @@ export const QuizView: React.FC<QuizViewProps> = ({
   onNavigateToHome,
 }) => {
   useScrollReveal();
+
+  // Balanced shuffled options mapping: questionId -> array of options
+  const [shuffledOptions, setShuffledOptions] = useState<Record<number, string[]>>(() => {
+    const session = progressManager.getQuizSession();
+    if (
+      session.shuffledOptions &&
+      typeof session.shuffledOptions === 'object' &&
+      QUIZ_QUESTIONS.every(
+        (q) =>
+          Array.isArray(session.shuffledOptions?.[q.id]) &&
+          session.shuffledOptions[q.id].length === q.options.length
+      )
+    ) {
+      return session.shuffledOptions;
+    }
+    const generated = generateShuffledOptions(QUIZ_QUESTIONS);
+    progressManager.saveQuizSession({ shuffledOptions: generated });
+    return generated;
+  });
 
   // Quiz active state: restore from progressManager so navigating away does not restart from first
   const [hasStarted, setHasStarted] = useState<boolean>(() => {
@@ -260,6 +350,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
   const [studentAnswers, setStudentAnswers] = useState<Record<number, StudentAnswerRecord>>(() => {
     const session = progressManager.getQuizSession();
     const answers: Record<number, StudentAnswerRecord> = { ...(session.studentAnswers || {}) };
+    const sessionShuffled = session.shuffledOptions || {};
 
     // Reconstruct / sync from progressManager recorded questions
     const recordedQuestions = progressManager.getAllQuizQuestions();
@@ -268,14 +359,19 @@ export const QuizView: React.FC<QuizViewProps> = ({
       if (!answers[qId] && rec.status !== 'unanswered') {
         const qDef = QUIZ_QUESTIONS.find((item) => item.id === qId);
         if (qDef) {
+          const opts = sessionShuffled[qId] || qDef.options;
           const isTimeout = rec.status === 'timeout' || rec.selectedOptionIndex === -1;
           const isCorrect = rec.status === 'correct';
           const selIdx = rec.selectedOptionIndex !== undefined ? rec.selectedOptionIndex : -1;
+          const correctShuffledIndex = opts.indexOf(qDef.correctAnswerText);
+          const effectiveCorrectIdx = correctShuffledIndex >= 0 ? correctShuffledIndex : qDef.correctIndex;
+
           answers[qId] = {
             questionId: qId,
             selectedOptionIndex: selIdx,
-            selectedAnswerText: selIdx >= 0 && qDef.options[selIdx] ? qDef.options[selIdx] : 'Unanswered / Timed out',
-            correctOptionIndex: qDef.correctIndex,
+            selectedAnswerText:
+              selIdx >= 0 && opts[selIdx] ? opts[selIdx] : 'Not Answered',
+            correctOptionIndex: effectiveCorrectIdx,
             correctAnswerText: qDef.correctAnswerText,
             isCorrect,
             isTimeout,
@@ -337,8 +433,9 @@ export const QuizView: React.FC<QuizViewProps> = ({
       hasStarted: true,
       currentQuestionIndex: newIndex,
       timeLeft: isAnswered ? 20 : 20,
+      shuffledOptions,
     });
-  }, [studentAnswers]);
+  }, [studentAnswers, shuffledOptions]);
 
   // Save session when unmounting / navigating away to another section
   useEffect(() => {
@@ -350,10 +447,11 @@ export const QuizView: React.FC<QuizViewProps> = ({
           timeLeft,
           isSubmitted,
           studentAnswers,
+          shuffledOptions,
         });
       }
     };
-  }, [hasStarted, currentQuestionIndex, timeLeft, isSubmitted, studentAnswers]);
+  }, [hasStarted, currentQuestionIndex, timeLeft, isSubmitted, studentAnswers, shuffledOptions]);
 
   // Current question helper
   const currentQuestion = QUIZ_QUESTIONS[currentQuestionIndex] || QUIZ_QUESTIONS[0];
@@ -364,14 +462,39 @@ export const QuizView: React.FC<QuizViewProps> = ({
   const finishQuiz = useCallback((finalAnswers: Record<number, StudentAnswerRecord>) => {
     setIsSubmitted(true);
 
+    const completeAnswers: Record<number, StudentAnswerRecord> = { ...finalAnswers };
+
+    // Ensure every question has an authoritative answer record; any unvisited/skipped question is marked Not Answered (0 pts)
+    QUIZ_QUESTIONS.forEach((q) => {
+      if (!completeAnswers[q.id]) {
+        const opts = shuffledOptions[q.id] || q.options;
+        const correctShuffledIndex = opts.indexOf(q.correctAnswerText);
+        const effectiveCorrectIdx = correctShuffledIndex >= 0 ? correctShuffledIndex : q.correctIndex;
+
+        completeAnswers[q.id] = {
+          questionId: q.id,
+          selectedOptionIndex: -1,
+          selectedAnswerText: 'Not Answered',
+          correctOptionIndex: effectiveCorrectIdx,
+          correctAnswerText: q.correctAnswerText,
+          isCorrect: false,
+          isTimeout: true,
+          points: 0,
+        };
+        progressManager.recordQuizQuestion(q.id, 'timeout', -1);
+      }
+    });
+
+    setStudentAnswers(completeAnswers);
+
     let calculatedCorrect = 0;
     QUIZ_QUESTIONS.forEach((q) => {
-      const rec = finalAnswers[q.id];
+      const rec = completeAnswers[q.id];
       if (rec && rec.isCorrect) calculatedCorrect++;
     });
 
     const rawScoresMap: Record<number, number> = {};
-    (Object.values(finalAnswers) as StudentAnswerRecord[]).forEach((rec) => {
+    (Object.values(completeAnswers) as StudentAnswerRecord[]).forEach((rec) => {
       rawScoresMap[rec.questionId] = rec.selectedOptionIndex;
     });
 
@@ -379,8 +502,9 @@ export const QuizView: React.FC<QuizViewProps> = ({
     progressManager.saveQuizSession({
       hasStarted: true,
       isSubmitted: true,
-      studentAnswers: finalAnswers,
+      studentAnswers: completeAnswers,
       currentQuestionIndex,
+      shuffledOptions,
     });
 
     if (calculatedCorrect >= 6) {
@@ -388,7 +512,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
     } else {
       soundManager.playQuizWrong();
     }
-  }, [currentQuestionIndex]);
+  }, [currentQuestionIndex, shuffledOptions]);
 
   // Automatic timeout handler when 20 seconds expire
   const handleTimeout = useCallback(() => {
@@ -397,11 +521,15 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
     soundManager.playError();
 
+    const opts = shuffledOptions[q.id] || q.options;
+    const correctShuffledIndex = opts.indexOf(q.correctAnswerText);
+    const effectiveCorrectIdx = correctShuffledIndex >= 0 ? correctShuffledIndex : q.correctIndex;
+
     const newRecord: StudentAnswerRecord = {
       questionId: q.id,
       selectedOptionIndex: -1,
-      selectedAnswerText: 'Unanswered / Timed out',
-      correctOptionIndex: q.correctIndex,
+      selectedAnswerText: 'Not Answered',
+      correctOptionIndex: effectiveCorrectIdx,
       correctAnswerText: q.correctAnswerText,
       isCorrect: false,
       isTimeout: true,
@@ -427,30 +555,39 @@ export const QuizView: React.FC<QuizViewProps> = ({
         currentQuestionIndex: nextIndex,
         timeLeft: 20,
         studentAnswers: updatedAnswers,
+        shuffledOptions,
       });
     } else {
       finishQuiz(updatedAnswers);
     }
-  }, [currentQuestionIndex, studentAnswers, finishQuiz]);
+  }, [currentQuestionIndex, studentAnswers, shuffledOptions, finishQuiz]);
 
-  // Start quiz action
+  // Start quiz action: freshly randomize options with balanced Fisher-Yates distribution
   const handleStartQuiz = () => {
     soundManager.playClick();
+    const freshShuffled = generateShuffledOptions(QUIZ_QUESTIONS);
+    setShuffledOptions(freshShuffled);
     setHasStarted(true);
     setCurrentQuestionIndex(0);
     setTimeLeft(20);
+    setPendingSelection(null);
+    setStudentAnswers({});
+    progressManager.resetQuizSession();
     progressManager.saveQuizSession({
       hasStarted: true,
       currentQuestionIndex: 0,
       timeLeft: 20,
       isSubmitted: false,
       studentAnswers: {},
+      shuffledOptions: freshShuffled,
     });
   };
 
-  // Retake quiz action
+  // Internal reset helper
   const handleRetakeQuiz = () => {
     soundManager.playNav();
+    const freshShuffled = generateShuffledOptions(QUIZ_QUESTIONS);
+    setShuffledOptions(freshShuffled);
     setHasStarted(false);
     setIsSubmitted(false);
     setStudentAnswers({});
@@ -458,6 +595,9 @@ export const QuizView: React.FC<QuizViewProps> = ({
     setPendingSelection(null);
     setTimeLeft(20);
     progressManager.resetQuizSession();
+    progressManager.saveQuizSession({
+      shuffledOptions: freshShuffled,
+    });
   };
 
   // Timer countdown effect: 20 seconds for each question once quiz starts
@@ -530,14 +670,17 @@ export const QuizView: React.FC<QuizViewProps> = ({
     if (!hasStarted || pendingSelection === null || isCurrentQuestionAnswered) return;
 
     const q = currentQuestion;
-    const isCorrect = pendingSelection === q.correctIndex;
-    const selectedText = q.options[pendingSelection] || '';
+    const opts = shuffledOptions[q.id] || q.options;
+    const selectedText = opts[pendingSelection] || '';
+    const isCorrect = selectedText.trim() === q.correctAnswerText.trim();
+    const correctShuffledIndex = opts.indexOf(q.correctAnswerText);
+    const effectiveCorrectIdx = correctShuffledIndex >= 0 ? correctShuffledIndex : q.correctIndex;
 
     const newRecord: StudentAnswerRecord = {
       questionId: q.id,
       selectedOptionIndex: pendingSelection,
       selectedAnswerText: selectedText,
-      correctOptionIndex: q.correctIndex,
+      correctOptionIndex: effectiveCorrectIdx,
       correctAnswerText: q.correctAnswerText,
       isCorrect,
       isTimeout: false,
@@ -560,6 +703,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
       currentQuestionIndex,
       timeLeft,
       studentAnswers: updatedAnswers,
+      shuffledOptions,
     });
 
     if (isCorrect) {
@@ -574,13 +718,17 @@ export const QuizView: React.FC<QuizViewProps> = ({
     const updatedAnswers = { ...studentAnswers };
     if (pendingSelection !== null && !updatedAnswers[currentQuestion.id]) {
       const q = currentQuestion;
-      const isCorrect = pendingSelection === q.correctIndex;
-      const selectedText = q.options[pendingSelection] || '';
+      const opts = shuffledOptions[q.id] || q.options;
+      const selectedText = opts[pendingSelection] || '';
+      const isCorrect = selectedText.trim() === q.correctAnswerText.trim();
+      const correctShuffledIndex = opts.indexOf(q.correctAnswerText);
+      const effectiveCorrectIdx = correctShuffledIndex >= 0 ? correctShuffledIndex : q.correctIndex;
+
       const newRecord: StudentAnswerRecord = {
         questionId: q.id,
         selectedOptionIndex: pendingSelection,
         selectedAnswerText: selectedText,
-        correctOptionIndex: q.correctIndex,
+        correctOptionIndex: effectiveCorrectIdx,
         correctAnswerText: q.correctAnswerText,
         isCorrect,
         isTimeout: false,
@@ -843,16 +991,6 @@ export const QuizView: React.FC<QuizViewProps> = ({
             {/* Action Buttons */}
             <div className="flex flex-wrap items-center justify-center gap-3.5 sm:gap-4 mt-8 w-full max-w-xl mx-auto">
               <button
-                id="btn-quiz-retake"
-                type="button"
-                onClick={handleRetakeQuiz}
-                className="px-5 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white font-sans text-xs sm:text-sm font-semibold shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>Retake Quiz</span>
-              </button>
-
-              <button
                 id="btn-quiz-review-answers"
                 type="button"
                 onClick={() => {
@@ -901,16 +1039,38 @@ export const QuizView: React.FC<QuizViewProps> = ({
               {QUIZ_QUESTIONS.map((q, idx) => {
                 const rec = studentAnswers[q.id];
                 const isCorrect = rec?.isCorrect || false;
+                const isSkipped = !rec || rec.isTimeout || rec.selectedOptionIndex < 0;
                 const cleanQuestionText = q.question.replace(/^\d+\.\s*/, '');
                 const questionNumberStr = idx + 1 < 10 ? `0${idx + 1}` : `${idx + 1}`;
+
+                // Shuffled options for this question in this attempt
+                const opts = shuffledOptions[q.id] || q.options;
+                const correctShuffledIndex = opts.indexOf(q.correctAnswerText);
+                const effectiveCorrectIdx =
+                  correctShuffledIndex >= 0
+                    ? correctShuffledIndex
+                    : rec?.correctOptionIndex !== undefined && rec.correctOptionIndex >= 0
+                    ? rec.correctOptionIndex
+                    : q.correctIndex;
+                const correctLetter = String.fromCharCode(65 + effectiveCorrectIdx);
+
+                // User submission details
+                const hasSelected = rec && rec.selectedOptionIndex >= 0;
+                const userSelectedLetter = hasSelected
+                  ? String.fromCharCode(65 + rec.selectedOptionIndex)
+                  : '';
+                const userSelectedText = hasSelected ? rec.selectedAnswerText : 'Not Answered';
 
                 return (
                   <div
                     key={q.id}
                     id={`quiz-review-card-${q.id}`}
+                    data-question-id={q.id}
                     className={`p-6 sm:p-7 rounded-[22px] sm:rounded-[24px] bg-white dark:bg-[#0B1228] transition-all shadow-xs dark:shadow-[0_8px_30px_rgba(0,0,0,0.35)] ${
                       isCorrect
                         ? 'border-2 border-emerald-400 dark:border-emerald-500/50'
+                        : isSkipped
+                        ? 'border-2 border-amber-300 dark:border-amber-500/50'
                         : 'border-2 border-rose-300 dark:border-rose-500/50'
                     }`}
                   >
@@ -930,10 +1090,10 @@ export const QuizView: React.FC<QuizViewProps> = ({
                             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                             <span>Correct (+3 pts)</span>
                           </div>
-                        ) : rec?.isTimeout ? (
+                        ) : isSkipped ? (
                           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold font-sans">
                             <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Unanswered / Timed Out (0 pts)</span>
+                            <span>Not Answered (0 pts)</span>
                           </div>
                         ) : (
                           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-bold font-sans">
@@ -953,7 +1113,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                         className={`p-3.5 sm:p-4 rounded-xl border ${
                           isCorrect
                             ? 'bg-[#E8FAF0] dark:bg-emerald-950/40 border-[#A7F3D0] dark:border-emerald-500/30'
-                            : rec?.isTimeout
+                            : isSkipped
                             ? 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40'
                             : 'bg-[#FEECEB] dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/30'
                         }`}
@@ -962,7 +1122,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                           className={`text-[10px] sm:text-[11px] font-mono font-bold tracking-wider uppercase mb-1.5 font-sans ${
                             isCorrect
                               ? 'text-emerald-800 dark:text-emerald-300'
-                              : rec?.isTimeout
+                              : isSkipped
                               ? 'text-amber-800 dark:text-amber-300'
                               : 'text-rose-700 dark:text-rose-300'
                           }`}
@@ -970,9 +1130,9 @@ export const QuizView: React.FC<QuizViewProps> = ({
                           YOUR SUBMISSION:
                         </div>
                         <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 break-words">
-                          {rec && rec.selectedOptionIndex >= 0
-                            ? `${String.fromCharCode(65 + rec.selectedOptionIndex)}: ${rec.selectedAnswerText}`
-                            : 'Unanswered / Timed Out'}
+                          {hasSelected
+                            ? `${userSelectedLetter}: ${userSelectedText}`
+                            : 'Not Answered'}
                         </div>
                       </div>
 
@@ -981,7 +1141,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                           CORRECT ANSWER (+3 PTS):
                         </div>
                         <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 break-words">
-                          {String.fromCharCode(65 + q.correctIndex)}: {q.correctAnswerText}
+                          {correctLetter}: {q.correctAnswerText}
                         </div>
                       </div>
                     </div>
@@ -1120,60 +1280,69 @@ export const QuizView: React.FC<QuizViewProps> = ({
                 4. ANSWER OPTIONS
                ========================================================================= */}
             <div className="space-y-3">
-              {currentQuestion.options.map((opt, optIdx) => {
-                const isSelected = pendingSelection === optIdx;
-                let optStyle = '';
+              {(() => {
+                const displayedOptions = shuffledOptions[currentQuestion.id] || currentQuestion.options;
+                const correctOptionIndex = displayedOptions.indexOf(currentQuestion.correctAnswerText);
+                const effectiveCorrectIndex =
+                  correctOptionIndex >= 0 ? correctOptionIndex : currentQuestion.correctIndex;
 
-                if (!hasStarted) {
-                  optStyle =
-                    'bg-slate-50/70 dark:bg-[#080D1F]/60 border-slate-200/80 dark:border-blue-900/20 text-slate-400 dark:text-slate-500 opacity-60 cursor-not-allowed select-none';
-                } else if (isCurrentQuestionAnswered) {
-                  if (optIdx === currentQuestion.correctIndex) {
+                return displayedOptions.map((opt, optIdx) => {
+                  const isSelected = pendingSelection === optIdx;
+                  let optStyle = '';
+
+                  if (!hasStarted) {
                     optStyle =
-                      'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-bold ring-2 ring-emerald-400 dark:ring-emerald-500/40 cursor-default';
-                  } else if (isSelected && !currentAnswerRecord?.isCorrect) {
+                      'bg-slate-50/70 dark:bg-[#080D1F]/60 border-slate-200/80 dark:border-blue-900/20 text-slate-400 dark:text-slate-500 opacity-60 cursor-not-allowed select-none';
+                  } else if (isCurrentQuestionAnswered) {
+                    if (optIdx === effectiveCorrectIndex) {
+                      optStyle =
+                        'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-bold ring-2 ring-emerald-400 dark:ring-emerald-500/40 cursor-default';
+                    } else if (isSelected && !currentAnswerRecord?.isCorrect) {
+                      optStyle =
+                        'bg-rose-50 dark:bg-rose-950/60 border-rose-400 text-rose-950 dark:text-rose-200 font-bold cursor-default';
+                    } else {
+                      optStyle =
+                        'bg-white dark:bg-[#080D1F] opacity-40 border-slate-200 dark:border-blue-900/20 text-slate-400 dark:text-slate-500 cursor-not-allowed';
+                    }
+                  } else if (isSelected) {
                     optStyle =
-                      'bg-rose-50 dark:bg-rose-950/60 border-rose-400 text-rose-950 dark:text-rose-200 font-bold cursor-default';
+                      'bg-[#EFF6FF] dark:bg-blue-950/60 border-[#2563EB] dark:border-blue-500 text-[#1D4ED8] dark:text-blue-200 font-semibold ring-2 ring-[#2563EB]/40 dark:ring-blue-500/30 cursor-pointer';
                   } else {
                     optStyle =
-                      'bg-white dark:bg-[#080D1F] opacity-40 border-slate-200 dark:border-blue-900/20 text-slate-400 dark:text-slate-500 cursor-not-allowed';
+                      'bg-white dark:bg-[#080D1F] border-slate-200 dark:border-blue-900/30 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-slate-50 dark:hover:bg-[#0F1733] text-slate-800 dark:text-slate-200 cursor-pointer';
                   }
-                } else if (isSelected) {
-                  optStyle =
-                    'bg-[#EFF6FF] dark:bg-blue-950/60 border-[#2563EB] dark:border-blue-500 text-[#1D4ED8] dark:text-blue-200 font-semibold ring-2 ring-[#2563EB]/40 dark:ring-blue-500/30 cursor-pointer';
-                } else {
-                  optStyle =
-                    'bg-white dark:bg-[#080D1F] border-slate-200 dark:border-blue-900/30 hover:border-blue-300 dark:hover:border-blue-500/50 hover:bg-slate-50 dark:hover:bg-[#0F1733] text-slate-800 dark:text-slate-200 cursor-pointer';
-                }
 
-                return (
-                  <button
-                    key={optIdx}
-                    id={`quiz-q${currentQuestion.id}-opt${optIdx}`}
-                    onClick={() => handleSelectOption(optIdx)}
-                    disabled={!hasStarted || isCurrentQuestionAnswered}
-                    style={{ animationDelay: `${(optIdx + 1) * 60}ms` }}
-                    className={`w-full p-4 text-left text-sm font-sans rounded-xl border transition-all flex items-start gap-3.5 animate-chapter-switch ${optStyle}`}
-                  >
-                    <span
-                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border text-xs font-bold font-mono ${
-                        !hasStarted
-                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
-                          : isSelected
-                          ? isCurrentQuestionAnswered
-                            ? optIdx === currentQuestion.correctIndex
-                              ? 'bg-emerald-600 text-white border-emerald-600'
-                              : 'bg-rose-600 text-white border-rose-600'
-                            : 'bg-[#2563EB] dark:bg-blue-600 text-white border-[#2563EB] dark:border-blue-500'
-                          : 'bg-slate-100 dark:bg-[#0B1228] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-blue-900/40'
-                      }`}
+                  return (
+                    <button
+                      key={optIdx}
+                      id={`quiz-q${currentQuestion.id}-opt${optIdx}`}
+                      onClick={() => handleSelectOption(optIdx)}
+                      disabled={!hasStarted || isCurrentQuestionAnswered}
+                      style={{ animationDelay: `${(optIdx + 1) * 60}ms` }}
+                      className={`w-full p-4 text-left text-sm font-sans rounded-xl border transition-all flex items-start gap-3.5 animate-chapter-switch ${optStyle}`}
                     >
-                      {String.fromCharCode(65 + optIdx)}
-                    </span>
-                    <span className="flex-1 pt-0.5 leading-relaxed break-words">{opt}</span>
-                  </button>
-                );
-              })}
+                      <span
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border text-xs font-bold font-mono ${
+                          !hasStarted
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
+                            : isCurrentQuestionAnswered
+                            ? optIdx === effectiveCorrectIndex
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : isSelected
+                              ? 'bg-rose-600 text-white border-rose-600'
+                              : 'bg-slate-100 dark:bg-[#0B1228] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-blue-900/40'
+                            : isSelected
+                            ? 'bg-[#2563EB] dark:bg-blue-600 text-white border-[#2563EB] dark:border-blue-500'
+                            : 'bg-slate-100 dark:bg-[#0B1228] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-blue-900/40'
+                        }`}
+                      >
+                        {String.fromCharCode(65 + optIdx)}
+                      </span>
+                      <span className="flex-1 pt-0.5 leading-relaxed break-words">{opt}</span>
+                    </button>
+                  );
+                });
+              })()}
             </div>
 
             {/* =========================================================================

@@ -18,10 +18,9 @@ import {
   Info,
   Check,
   Eye,
-  Award,
 } from 'lucide-react';
 import { soundManager } from '../utils/audio';
-import { progressManager, VISUALIZE_ACTIVITIES } from '../utils/progressManager';
+import { progressManager } from '../utils/progressManager';
 
 export interface SLLVideoVisualizerProps {
   lessonId?: 'lesson-01' | 'lesson-02';
@@ -47,18 +46,16 @@ interface StepInfo {
 interface ActivityConfig {
   id: VisualizeActivityId;
   title: string;
-  points: number;
   subtitle: string;
   description: string;
   steps: StepInfo[];
 }
 
 const ACTIVITIES: ActivityConfig[] = [
-  // 1. NODE VISUALIZATION (3 POINTS)
+  // 1. NODE VISUALIZATION
   {
     id: 'visualize_node',
     title: 'Node Visualization',
-    points: 3,
     subtitle: 'Node creation, DATA, NEXT, HEAD, NULL structure',
     description:
       'A Node is dynamically created on the Heap. It contains two distinct components: a DATA field and a NEXT pointer field.',
@@ -98,11 +95,10 @@ const ACTIVITIES: ActivityConfig[] = [
     ],
   },
 
-  // 2. LINKING NODES (3 POINTS)
+  // 2. LINKING NODES
   {
     id: 'visualize_linking',
     title: 'Linking Nodes',
-    points: 3,
     subtitle: 'Unidirectional Pointer Links between Memory Addresses',
     description:
       'Nodes in a Singly Linked List are chained together by assigning the NEXT pointer of Node A to the heap address of Node B.',
@@ -134,11 +130,10 @@ const ACTIVITIES: ActivityConfig[] = [
     ],
   },
 
-  // 3. TRAVERSAL VISUALIZATION (3 POINTS)
+  // 3. TRAVERSAL VISUALIZATION
   {
     id: 'visualize_traversal',
     title: 'Traversal Visualization',
-    points: 3,
     subtitle: 'Sequential Traversal from HEAD to NULL Sentinel',
     description:
       'Traversal sequentially moves a temporary pointer (CURRENT) through each node following the NEXT references until reaching NULL.',
@@ -178,11 +173,10 @@ const ACTIVITIES: ActivityConfig[] = [
     ],
   },
 
-  // 4. INSERTION VISUALIZATION (3 POINTS)
+  // 4. INSERTION VISUALIZATION
   {
     id: 'visualize_insertion',
     title: 'Insertion Visualization',
-    points: 3,
     subtitle: 'Prepend at HEAD, Append at End, and Insert Between',
     description:
       'Inserting a node involves creating the node, rewiring the predecessor NEXT pointer to the new node, and connecting the new node to the successor.',
@@ -214,11 +208,10 @@ const ACTIVITIES: ActivityConfig[] = [
     ],
   },
 
-  // 5. DELETION VISUALIZATION (3 POINTS)
+  // 5. DELETION VISUALIZATION
   {
     id: 'visualize_deletion',
     title: 'Deletion Visualization',
-    points: 3,
     subtitle: 'Bypass Target Node & Release Memory',
     description:
       'Deleting a node requires bypassing the target node by updating the predecessor pointer (prev->next = target->next) and calling free(target).',
@@ -255,14 +248,12 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
   const [activeActivityIndex, setActiveActivityIndex] = useState<number>(0);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [visualizeScore, setVisualizeScore] = useState<number>(() =>
-    progressManager.getCategoryScore('visualize')
-  );
+  const [, setUpdateTrigger] = useState<number>(0);
   const playTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const unsub = progressManager.subscribe(() => {
-      setVisualizeScore(progressManager.getCategoryScore('visualize'));
+      setUpdateTrigger((v) => v + 1);
     });
     return unsub;
   }, []);
@@ -325,7 +316,7 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
 
   const handleCompleteActivity = () => {
     if (isActivityCompleted) return;
-    const result = progressManager.completeVisualizeActivity(activeActivity.id);
+    const result = progressManager.completeInteractiveVisualizerActivity(activeActivity.id);
     if (result.newlyCompleted) {
       soundManager.playCelebrate();
       if (onComplete) onComplete();
@@ -335,7 +326,7 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
   return (
     <div className="w-full bg-[#050A1A] rounded-3xl border border-blue-900/50 shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_30px_rgba(37,99,235,0.15)] overflow-hidden text-white select-none font-sans">
       {/* 1. VISUALIZER TOP BAR HUD */}
-      <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-[#0B1533] via-[#091026] to-[#0B1533] border-b border-blue-800/40 flex flex-wrap items-center justify-between gap-3">
+      <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-[#0B1533] via-[#091026] to-[#0B1533] border-b border-blue-800/40 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center font-bold">
             <Eye className="w-5 h-5" />
@@ -347,14 +338,6 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
             <h3 className="text-sm sm:text-base font-extrabold text-white">
               Single Linked List Interactive Visualizer
             </h3>
-          </div>
-        </div>
-
-        {/* Live Score Pill */}
-        <div className="flex items-center gap-2">
-          <div className="px-3 py-1.5 rounded-xl bg-blue-950/80 border border-blue-700/50 font-mono text-xs font-bold text-cyan-300 flex items-center gap-2 shadow-xs">
-            <Award className="w-4 h-4 text-cyan-400" />
-            <span>Score: {visualizeScore} / 15 Pts</span>
           </div>
         </div>
       </div>
@@ -379,15 +362,7 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
                 {idx + 1}
               </span>
               <span>{act.title}</span>
-              <span
-                className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                  isDone
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'bg-blue-900/40 text-blue-300'
-                }`}
-              >
-                {isDone ? '✓ +3 pts' : '3 pts'}
-              </span>
+              {isDone && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
             </button>
           );
         })}
@@ -415,18 +390,14 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
             </div>
 
             {/* Completion Status Badge */}
-            <div>
-              {isActivityCompleted ? (
+            {isActivityCompleted && (
+              <div>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Activity Completed (+3 Pts)</span>
+                  <span>Activity Completed</span>
                 </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-950/60 border border-blue-700/40 text-blue-300 text-xs font-mono font-bold">
-                  <span>3 Points Available</span>
-                </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* VISUAL DIAGRAM DISPLAY */}
@@ -679,17 +650,18 @@ export const SLLVideoVisualizer: React.FC<SLLVideoVisualizerProps> = ({ onComple
                 type="button"
                 id={`btn-complete-vis-${activeActivity.id}`}
                 onClick={handleCompleteActivity}
-                className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all ${
+                disabled={isActivityCompleted}
+                className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all ${
                   isActivityCompleted
                     ? 'bg-emerald-600/40 text-emerald-300 border border-emerald-500/50 cursor-default'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 cursor-pointer active:scale-95'
                 }`}
               >
                 <Check className="w-4 h-4" />
                 <span>
                   {isActivityCompleted
-                    ? '✓ Activity Completed (+3 Pts)'
-                    : 'Complete Activity (+3 Pts)'}
+                    ? 'ACTIVITY COMPLETED'
+                    : 'COMPLETE ACTIVITY'}
                 </span>
               </button>
             </div>

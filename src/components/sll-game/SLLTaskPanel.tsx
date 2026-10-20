@@ -54,6 +54,7 @@ interface SLLTaskPanelProps {
   } | null;
   onSearchAnswer?: (isMatch: boolean) => void;
   deletePosition?: number;
+  insertPosition?: number;
   baseScore?: number;
   scoreBreakdown?: {
     baseScore: number;
@@ -94,6 +95,7 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
   searchStepPrompt,
   onSearchAnswer,
   deletePosition = 2,
+  insertPosition = 3,
   baseScore,
   scoreBreakdown,
 }) => {
@@ -101,14 +103,21 @@ export const SLLTaskPanel: React.FC<SLLTaskPanelProps> = ({
   const target = task?.targetCondition || {};
   const safeNodes = Array.isArray(nodes) ? nodes : [];
   const safePointers = pointers && typeof pointers === 'object' ? pointers : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
-  const targetExpectedCount = target.nodeCount ?? target.expectedNodesCount ?? target.expectedOrder?.length;
-  const targetExpectedHead = target.headAddress !== undefined ? target.headAddress : target.expectedHead;
-  const targetExpectedTail = target.tailAddress !== undefined ? target.tailAddress : target.expectedTail;
+  let targetExpectedCount = target.nodeCount ?? target.expectedNodesCount ?? target.expectedOrder?.length;
+  let targetExpectedHead = target.headAddress !== undefined ? target.headAddress : target.expectedHead;
+  let targetExpectedTail = target.tailAddress !== undefined ? target.tailAddress : target.expectedTail;
+
+  if (task.id === 'L4_T1') {
+    targetExpectedCount = 6;
+    targetExpectedHead = insertPosition === 1 ? 1006 : 1001;
+    targetExpectedTail = insertPosition === 6 ? 1006 : 1005;
+  }
 
   const isCountOk = targetExpectedCount === undefined || safeNodes.length === targetExpectedCount;
   const isHeadOk = targetExpectedHead === undefined || safePointers.headAddress === targetExpectedHead;
   const isTailOk = targetExpectedTail === undefined || safePointers.tailAddress === targetExpectedTail;
-  const allSteps = getAllTaskSteps(task, safeNodes, safePointers, deletePosition);
+  const activePos = task.id === 'L4_T1' ? insertPosition : deletePosition;
+  const allSteps = getAllTaskSteps(task, safeNodes, safePointers, activePos);
 
   return (
     <div className="w-full flex flex-col gap-4 font-sans">

@@ -52,6 +52,8 @@ import {
   getTaskStep,
   getTaskTotalSteps,
   getAllTaskSteps,
+  getNextUncompletedStepNumber,
+  getInsertionNewNodeSpec,
 } from '../../utils/sllStepAssistant';
 import { validateTaskAnswer } from '../../utils/sllValidator';
 import { soundManager } from '../../utils/audio';
@@ -242,6 +244,42 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     });
   };
 
+  // Dynamic position for L4_T1 ("Insert at Any Position")
+  const [insertPosition, setInsertPosition] = useState<number>(3);
+
+  const handleSelectInsertPosition = (pos: number) => {
+    setSelectedAddress(null);
+    setPendingConnectFrom(null);
+    setIsSettingHeadMode(false);
+    setIsSettingTailMode(false);
+    setIsDeletingNodeMode(false);
+    setIsConnectingNextMode(false);
+    setCurrentStep(1);
+    setCompletedSteps([]);
+    setTaskStatus('in_progress');
+    setIsCompleted(false);
+    setTeacherLastActionResult(null);
+    setIsGuidedSolveActive(false);
+    setHistory([]);
+    setRedoStack([]);
+
+    const initialNodes = Array.isArray(activeTask?.initialNodes) ? JSON.parse(JSON.stringify(activeTask.initialNodes)) : [];
+    const initialPointers = activeTask?.initialPointers
+      ? JSON.parse(JSON.stringify(activeTask.initialPointers))
+      : { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null };
+    setNodes(initialNodes);
+    setPointers(initialPointers);
+
+    setInsertPosition(pos);
+    soundManager.play('click');
+    const desc = pos === 1 ? 'Beginning Insertion' : pos === 6 ? 'End Insertion' : 'Middle Insertion';
+    setFeedback({
+      type: 'info',
+      title: `Position ${pos} Selected (${desc})`,
+      message: `Target updated dynamically to Position ${pos}. Follow the step guidance or click Guided Solve to proceed.`,
+    });
+  };
+
   // Evaluation & HUD
   const [feedback, setFeedback] = useState<SLLFeedback | null>(null);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
@@ -285,6 +323,9 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     setRedoStack([]);
     if (taskId === 'L4_T2') {
       setDeletePosition(2);
+    }
+    if (taskId === 'L4_T1') {
+      setInsertPosition(3);
     }
   };
 
@@ -838,24 +879,111 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   // Search Step Interaction (Level 4 Task 4)
   const currentSearchNode = nodes.find((n) => n.address === pointers.currentAddress);
 
-  // Active Teacher Step for GUIDE & SOLVE mode (real sequential step state machine)
-  const currentTeacherStep = getTaskStep(activeTask, currentStep, nodes, pointers, deletePosition);
-  const totalTaskSteps = getTaskTotalSteps(activeTask, nodes, pointers, deletePosition);
+  // Execution lock to prevent rapid clicks and race conditions
+  const [isExecutingStep, setIsExecutingStep] = useState<boolean>(false);
 
-  // Dynamic Node Role Labels for L4_T2 ("Delete at Any Position")
-  const nodeRoleLabels = useMemo(() => {
-    if (activeTask.id !== 'L4_T2') return undefined;
-    const labels: Record<number, string> = {};
-    if (currentTeacherStep?.highlightAddresses && currentTeacherStep.highlightAddresses.length === 3) {
-      const [prevAddr, tgtAddr, nextAddr] = currentTeacherStep.highlightAddresses;
-      if (prevAddr) labels[prevAddr] = 'PREVIOUS';
-      if (tgtAddr) labels[tgtAddr] = 'TARGET';
-      if (nextAddr) labels[nextAddr] = 'NEXT';
-    } else if (currentTeacherStep?.targetAddress) {
-      labels[currentTeacherStep.targetAddress] = 'TARGET';
+  // Active position for dynamic position tasks (L4_T1 / L4_T2)
+  const activePosition = activeTask.id === 'L4_T2' ? deletePosition : insertPosition;
+
+  // Dynamic task overrides for L4_T1 (Insert at Any Position)
+  const currentTaskView = useMemo(() => {
+    if (activeTask.id !== 'L4_T1') return activeTask;
+
+    const newSpec = getInsertionNewNodeSpec(nodes, pointers, insertPosition);
+    let title = 'Task 1: Insert in the Middle';
+    let objective = '';
+    let codeEquivalent = '';
+
+    if (insertPosition === 1) {
+      title = 'Task 1: Insert at Beginning';
+      objective = `Insert Node ${newSpec.data} (at ${newSpec.address}) at Position 1, before Node 10. Connect the new node to the original head, then update HEAD to the new node.`;
+      codeEquivalent = `newNode->next = head;\nhead = newNode;\n\nif (tail == nullptr) {\n    tail = newNode;\n}`;
+    } else if (insertPosition === 6) {
+      title = 'Task 1: Insert at the End';
+      objective = `Insert Node ${newSpec.data} (at ${newSpec.address}) at Position 6, after Node 50. Connect the current tail to the new node, then update TAIL to the new node.`;
+      codeEquivalent = `newNode->next = nullptr;\n\nif (head == nullptr) {\n    head = tail = newNode;\n} else {\n    tail->next = newNode;\n    tail = newNode;\n}`;
+    } else {
+      const initialChain = [10, 20, 30, 40, 50];
+      const prevVal = initialChain[insertPosition - 2];
+      const succVal = initialChain[insertPosition - 1];
+      title = 'Task 1: Insert in the Middle';
+      objective = `Insert Node ${newSpec.data} (at ${newSpec.address}) at Position ${insertPosition}, between Node ${prevVal} and Node ${succVal}. First connect the new node to Node ${succVal}, then connect Node ${prevVal} to Node ${newSpec.data}.`;
+      codeEquivalent = `newNode->next = prev->next;\nprev->next = newNode;`;
     }
-    return labels;
-  }, [activeTask.id, currentTeacherStep]);
+
+    return {
+      ...activeTask,
+      title,
+      objective,
+      codeEquivalent,
+      defaultInputValues: {
+        data: newSpec.data,
+        address: newSpec.address,
+        next: insertPosition === 6 ? null : (insertPosition === 1 ? 1001 : 1000 + insertPosition),
+      },
+    };
+  }, [activeTask, insertPosition, nodes, pointers]);
+
+  // Dynamically derive the exact uncompleted step from live workspace state
+  const currentStepDerived = useMemo(() => {
+    return getNextUncompletedStepNumber(
+      activeTask,
+      nodes,
+      pointers,
+      traversalOutput,
+      searchResult === 'found',
+      activePosition
+    );
+  }, [activeTask, nodes, pointers, traversalOutput, searchResult, activePosition]);
+
+  const activeStepNumber = isGuidedSolveActive ? currentStepDerived : currentStep;
+  const currentTeacherStep = getTaskStep(activeTask, activeStepNumber, nodes, pointers, activePosition);
+  const totalTaskSteps = getTaskTotalSteps(activeTask, nodes, pointers, activePosition);
+
+  // Dynamic Node Role Labels for L4_T2 ("Delete at Any Position") & L4_T1 ("Insert at Any Position")
+  const nodeRoleLabels = useMemo(() => {
+    if (activeTask.id === 'L4_T2') {
+      const labels: Record<number, string> = {};
+      if (currentTeacherStep?.highlightAddresses && currentTeacherStep.highlightAddresses.length === 3) {
+        const [prevAddr, tgtAddr, nextAddr] = currentTeacherStep.highlightAddresses;
+        if (prevAddr) labels[prevAddr] = 'PREVIOUS';
+        if (tgtAddr) labels[tgtAddr] = 'TARGET';
+        if (nextAddr) labels[nextAddr] = 'NEXT';
+      } else if (currentTeacherStep?.targetAddress) {
+        labels[currentTeacherStep.targetAddress] = 'TARGET';
+      }
+      return labels;
+    }
+    if (activeTask.id === 'L4_T1') {
+      const labels: Record<number, string> = {};
+      const newSpec = getInsertionNewNodeSpec(nodes, pointers, insertPosition);
+      const newNode = nodes.find((n) => n.address === newSpec.address || n.data === newSpec.data);
+      if (newNode) {
+        labels[newNode.address] = 'NEW NODE';
+      }
+      if (insertPosition === 1) {
+        const headNode = nodes.find((n) => n.address === pointers.headAddress && n.address !== newNode?.address);
+        if (headNode) labels[headNode.address] = 'HEAD';
+      } else if (insertPosition === 6) {
+        const tailNode = nodes.find((n) => n.address === pointers.tailAddress && n.address !== newNode?.address);
+        if (tailNode) labels[tailNode.address] = 'TAIL';
+      } else {
+        const defaultChain = [
+          { address: 1001, data: 10 },
+          { address: 1002, data: 20 },
+          { address: 1003, data: 30 },
+          { address: 1004, data: 40 },
+          { address: 1005, data: 50 },
+        ];
+        const prev = defaultChain[insertPosition - 2];
+        const succ = defaultChain[insertPosition - 1];
+        if (prev) labels[prev.address] = 'PREVIOUS';
+        if (succ) labels[succ.address] = 'SUCCESSOR';
+      }
+      return labels;
+    }
+    return undefined;
+  }, [activeTask.id, currentTeacherStep, insertPosition, nodes, pointers]);
 
   // Active Highlight Addresses: during traversal, enforce strict 2-node maximum highlighting:
   // [Current visited node, Next target node] or [HEAD node]
@@ -880,7 +1008,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     targetVal?: number | null
   ) => {
     if (taskStatus === 'completed' || isCompleted) return;
-    const step = currentTeacherStep || getTaskStep(activeTask, currentStep, nodes, pointers, deletePosition);
+    const step = currentTeacherStep || getTaskStep(activeTask, activeStepNumber, nodes, pointers, activePosition);
     if (!step) return;
 
     let matched = false;
@@ -901,7 +1029,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     }
 
     if (matched) {
-      const stepJustFinished = currentStep;
+      const stepJustFinished = activeStepNumber;
       const newCompleted = [...new Set([...completedSteps, stepJustFinished])];
       setCompletedSteps(newCompleted);
 
@@ -919,62 +1047,151 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
   };
 
   // TEACHER STEP: Executes exactly ONE logical action in the live workspace
-  const handleExecuteTeacherStep = () => {
-    if (taskStatus === 'completed' || isCompleted) return;
+  const handleExecuteSingleStep = (stepNumberToRun?: number) => {
+    if (taskStatus === 'completed' || isCompleted || isExecutingStep) return;
 
-    const stepToExecute = currentTeacherStep || getTaskStep(activeTask, currentStep, nodes, pointers, deletePosition);
-    if (!stepToExecute) return;
+    const stepNum = typeof stepNumberToRun === 'number'
+      ? stepNumberToRun
+      : getNextUncompletedStepNumber(activeTask, nodes, pointers, traversalOutput, searchResult === 'found', activePosition);
 
-    pushSnapshot();
-    const result = executeSingleTeacherStep(stepToExecute, {
-      nodes,
-      pointers,
-      traversalOutput,
-    });
-    setNodes(result.nodes);
-    setPointers(result.pointers);
-    setTraversalOutput(result.traversalOutput);
-    setTeacherLastActionResult(result.feedbackMessage);
-
-    const stepJustFinished = currentStep;
-    const newCompleted = [...new Set([...completedSteps, stepJustFinished])];
-    setCompletedSteps(newCompleted);
-    soundManager.play('link');
-
-    // Check if task is finished
-    const isLastStep = stepJustFinished >= totalTaskSteps || stepToExecute.isCompleted;
-
-    if (isLastStep) {
+    if (stepNum > totalTaskSteps) {
       triggerTaskCompletion(
         'TASK COMPLETED! 🎉',
-        result.feedbackMessage || 'All steps completed! You built the linked list correctly.'
+        'All steps completed! You built the linked list correctly.'
       );
-    } else {
-      const nextStepNum = stepJustFinished + 1;
-      setCurrentStep(nextStepNum);
-      const nextStepDef = getTaskStep(activeTask, nextStepNum, result.nodes, result.pointers, deletePosition);
-      setFeedback({
-        type: 'info',
-        title: `✓ Step ${stepJustFinished} Completed!`,
-        message: `${result.feedbackMessage} Next: Step ${nextStepNum} - ${nextStepDef?.title || 'Next step'}`,
+      return;
+    }
+
+    const stepToExecute = getTaskStep(activeTask, stepNum, nodes, pointers, activePosition);
+    if (!stepToExecute) return;
+
+    setIsExecutingStep(true);
+    try {
+      pushSnapshot();
+      const result = executeSingleTeacherStep(stepToExecute, {
+        nodes,
+        pointers,
+        traversalOutput,
       });
+
+      setNodes(result.nodes);
+      setPointers(result.pointers);
+      setTraversalOutput(result.traversalOutput);
+      setTeacherLastActionResult(result.feedbackMessage);
+
+      const newCompleted = [...new Set([...completedSteps, stepNum])];
+      setCompletedSteps(newCompleted);
+      soundManager.play('link');
+
+      // Authoritative task validation
+      const val = validateTaskAnswer(
+        activeTask,
+        result.nodes,
+        result.pointers,
+        result.traversalOutput,
+        searchResult === 'found' || stepToExecute.isCompleted,
+        activePosition
+      );
+
+      const nextUncompleted = getNextUncompletedStepNumber(
+        activeTask,
+        result.nodes,
+        result.pointers,
+        result.traversalOutput,
+        searchResult === 'found' || stepToExecute.isCompleted,
+        activePosition
+      );
+
+      const isLastStep = isGuidedSolveActive
+        ? (stepNum >= totalTaskSteps || stepToExecute.isCompleted)
+        : (stepToExecute.isCompleted || val.isValid || nextUncompleted > totalTaskSteps);
+
+      if (isLastStep) {
+        triggerTaskCompletion(
+          'TASK COMPLETED! 🎉',
+          result.feedbackMessage || 'All steps completed! You built the linked list correctly.'
+        );
+      } else {
+        const nextStep = isGuidedSolveActive ? stepNum + 1 : nextUncompleted;
+        setCurrentStep(nextStep);
+        const nextStepDef = getTaskStep(activeTask, nextStep, result.nodes, result.pointers, activePosition);
+        setFeedback({
+          type: 'info',
+          title: `✓ Step ${stepNum} Completed!`,
+          message: `${result.feedbackMessage} Next: Step ${nextStep} - ${nextStepDef?.title || 'Next step'}`,
+        });
+      }
+    } finally {
+      setTimeout(() => {
+        setIsExecutingStep(false);
+      }, 200);
     }
   };
 
-  // GUIDEDSOLVE: Deducts 3 points on every activation, enables NEXT STEP flow, executes exactly ONE step
-  const handleGuidedSolveClick = () => {
-    if (taskStatus === 'completed' || isCompleted) return;
+  // GUIDED SOLVE: Starts guided solve mode, deducts 3 points once per session, detects current step, executes one step
+  const handleStartGuidedSolve = () => {
+    if (taskStatus === 'completed' || isCompleted || isExecutingStep) return;
     soundManager.play('click');
     progressManager.deductGuidedSolvePoints(taskId);
     setIsGuidedSolveActive(true);
-    handleExecuteTeacherStep();
+
+    const stepToStart = getNextUncompletedStepNumber(
+      activeTask,
+      nodes,
+      pointers,
+      traversalOutput,
+      searchResult === 'found',
+      activePosition
+    );
+
+    if (stepToStart > totalTaskSteps) {
+      triggerTaskCompletion(
+        'TASK COMPLETED! 🎉',
+        'All steps completed! You built the linked list correctly.'
+      );
+      return;
+    }
+
+    setCurrentStep(stepToStart);
+    handleExecuteSingleStep(stepToStart);
   };
 
-  // NEXT STEP: Executes exactly ONE guided step with 0 points deducted
+  // STOP GUIDED SOLVE: Preserves current workspace, pointers, and memory; returns to normal gameplay immediately
+  const handleStopGuidedSolve = () => {
+    soundManager.play('click');
+    setIsGuidedSolveActive(false);
+    setFeedback({
+      type: 'info',
+      title: 'Guided Solve Stopped',
+      message: 'Workspace preserved! You can continue playing manually or activate Guided Solve again anytime.',
+    });
+  };
+
+  // NEXT STEP: Executes exactly ONE guided step with 0 additional points deducted
   const handleNextStepClick = () => {
-    if (taskStatus === 'completed' || isCompleted) return;
+    if (taskStatus === 'completed' || isCompleted || isExecutingStep) return;
     soundManager.play('step');
-    handleExecuteTeacherStep();
+
+    const nextStepToExec = currentStep <= totalTaskSteps
+      ? currentStep
+      : getNextUncompletedStepNumber(
+          activeTask,
+          nodes,
+          pointers,
+          traversalOutput,
+          searchResult === 'found',
+          activePosition
+        );
+
+    if (nextStepToExec > totalTaskSteps) {
+      triggerTaskCompletion(
+        'TASK COMPLETED! 🎉',
+        'All steps completed! You built the linked list correctly.'
+      );
+      return;
+    }
+
+    handleExecuteSingleStep(nextStepToExec);
   };
 
   const handleSearchAnswer = (isMatchAnswer: boolean) => {
@@ -1019,7 +1236,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
     progressManager.incrementGameAttempt(taskId);
     setAttempts((prev) => prev + 1);
     const searchDone = isCompleted || searchResult === 'found';
-    const result = validateTaskAnswer(activeTask, nodes, pointers, traversalOutput, searchDone, deletePosition);
+    const result = validateTaskAnswer(activeTask, nodes, pointers, traversalOutput, searchDone, activePosition);
 
     if (result.isValid) {
       triggerTaskCompletion('CORRECT! Linked list verified.');
@@ -1302,16 +1519,56 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Left Column: Interactive RAM Workspace + Teacher Assistant + Bottom Controls */}
           <div className="lg:col-span-8 flex flex-col gap-4">
-            {/* GUIDE & SOLVE TEACHER BANNER: Teaches step & performs ONE step */}
+            {/* GUIDE & SOLVE TEACHER BANNER: Live Node Diagram + RAM Matrix + 2-3 Bullet Points + Next Step / Stop */}
             <SLLTeacherBanner
               step={currentTeacherStep}
               lastActionResult={teacherLastActionResult}
-              onExecuteStep={handleGuidedSolveClick}
               isTaskComplete={isCompleted || taskStatus === 'completed'}
               completedSteps={completedSteps}
+              isGuidedSolveActive={isGuidedSolveActive}
+              isExecuting={isExecutingStep}
+              onStartGuidedSolve={handleStartGuidedSolve}
+              onExecuteNextStep={handleNextStepClick}
+              onStopGuidedSolve={handleStopGuidedSolve}
               onNextTask={handleNextTaskClick}
               hasNextTask={Boolean(nextTaskId)}
+              nodes={nodes}
+              pointers={pointers}
             />
+
+          {/* DYNAMIC POSITION SELECTOR FOR L4_T1 ("Insert at Any Position") */}
+          {activeTask.id === 'L4_T1' && (
+            <div className="bg-white dark:bg-[#0B1228] border border-slate-200 dark:border-blue-900/30 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider font-mono">
+                  Insert Position:
+                </span>
+                <span className="text-xs font-semibold text-[#2563EB] dark:text-blue-400 font-mono">
+                  Position {insertPosition} {insertPosition === 1 ? '(Beginning Insertion)' : insertPosition === 6 ? '(End Insertion)' : '(Middle Insertion)'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[1, 2, 3, 4, 5, 6].map((pos) => {
+                  const isSelected = insertPosition === pos;
+                  return (
+                    <button
+                      key={pos}
+                      id={`insert-pos-${pos}-btn`}
+                      type="button"
+                      onClick={() => handleSelectInsertPosition(pos)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-400'
+                          : 'bg-slate-100 hover:bg-slate-200 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-blue-900/40'
+                      }`}
+                    >
+                      Pos {pos}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* DYNAMIC POSITION SELECTOR FOR L4_T2 ("Delete at Any Position") */}
           {activeTask.id === 'L4_T2' && (
@@ -1420,18 +1677,21 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
             assistanceMode={assistanceMode}
             isGuidedSolveActive={isGuidedSolveActive}
             isTaskComplete={isCompleted || taskStatus === 'completed'}
-            currentStep={currentStep}
+            currentStep={activeStepNumber}
             task={activeTask}
             nodes={nodes}
             pointers={pointers}
             onExecuteTeacherStep={handleNextStepClick}
+            onStartGuidedSolve={handleStartGuidedSolve}
+            onStopGuidedSolve={handleStopGuidedSolve}
+            isExecutingStep={isExecutingStep}
           />
         </div>
 
           {/* Right Column: Task Instructions & Evaluation Panel */}
           <div className="lg:col-span-4">
             <SLLTaskPanel
-              task={activeTask}
+              task={currentTaskView}
               nodes={nodes}
               pointers={pointers}
               selectedNode={selectedNode}
@@ -1470,7 +1730,8 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
                   : null
               }
               onSearchAnswer={handleSearchAnswer}
-              deletePosition={deletePosition}
+              deletePosition={activePosition}
+              insertPosition={insertPosition}
               baseScore={baseScore}
               scoreBreakdown={scoreBreakdown}
             />
@@ -1484,7 +1745,7 @@ export const SLLOperationGameScreen: React.FC<SLLOperationGameScreenProps> = ({
         onClose={() => setActiveModal('NONE')}
         nodes={nodes}
         pointers={pointers}
-        activeTask={activeTask}
+        activeTask={currentTaskView}
         selectedAddress={selectedAddress}
         onCreateNode={handleCreateNode}
         onChangeNext={handleChangeNext}

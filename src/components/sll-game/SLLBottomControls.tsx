@@ -12,6 +12,7 @@ import {
   Zap,
   Gamepad2,
   Sparkles,
+  Square,
 } from 'lucide-react';
 import { AssistanceMode, SLLNode, SLLPointerState, SLLTaskDef } from '../../types/sllGame';
 import { getContextualPlayAdvice } from '../../utils/sllStepAssistant';
@@ -44,6 +45,9 @@ interface SLLBottomControlsProps {
   nodes?: SLLNode[];
   pointers?: SLLPointerState;
   onExecuteTeacherStep?: () => void;
+  onStartGuidedSolve?: () => void;
+  onStopGuidedSolve?: () => void;
+  isExecutingStep?: boolean;
 }
 
 export const SLLBottomControls: React.FC<SLLBottomControlsProps> = ({
@@ -74,6 +78,9 @@ export const SLLBottomControls: React.FC<SLLBottomControlsProps> = ({
   nodes = [],
   pointers = { headAddress: null, tailAddress: null, currentAddress: null, tempAddress: null, prevAddress: null },
   onExecuteTeacherStep,
+  onStartGuidedSolve,
+  onStopGuidedSolve,
+  isExecutingStep = false,
 }) => {
   const isAnyDirectMode = isSettingHeadMode || isSettingTailMode || pendingConnectFrom !== null;
 
@@ -107,30 +114,58 @@ export const SLLBottomControls: React.FC<SLLBottomControlsProps> = ({
 
       {/* Main Controls Card */}
       <div className="w-full bg-white dark:bg-[#0B1228] border border-slate-200 dark:border-blue-900/30 rounded-3xl p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-2.5 font-sans">
-        {/* Left Side: Contextual Controls in PLAY mode OR NEXT STEP in Guided solve flow */}
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        {/* Left Side: Next Step & Stop Guided Solve OR Guided Solve Button */}
+        <div className="flex flex-wrap items-center gap-2">
           {isGuidedSolveActive ? (
-            /* GUIDED SOLVE FLOW: NEXT STEP (executes next step with 0 points deducted) */
-            <button
-              id="guide-solve-bottom-btn"
-              onClick={onExecuteTeacherStep}
-              disabled={isTaskComplete}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFF3E0] dark:bg-[#2A1D0D] border-2 border-[#FDBA5A] text-[#7C3F00] dark:text-[#FDBA5A] text-xs font-bold shadow-xs transition-all ${
-                isTaskComplete
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'hover:bg-[#FFE7C4] dark:hover:bg-[#382611] cursor-pointer hover:scale-105 active:scale-95'
-              }`}
-            >
-              <Zap className="w-4 h-4 fill-[#F59E0B] text-[#F59E0B]" />
-              <span>{isTaskComplete ? 'ALL STEPS COMPLETED' : 'NEXT STEP'}</span>
-            </button>
+            /* GUIDED SOLVE FLOW: NEXT STEP + STOP GUIDED SOLVE */
+            <>
+              <button
+                id="guide-solve-bottom-btn"
+                onClick={onExecuteTeacherStep}
+                disabled={isTaskComplete || isExecutingStep}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-xs transition-all ${
+                  isTaskComplete || isExecutingStep
+                    ? 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                    : 'bg-[#F59E0B] hover:bg-[#D97706] text-white shadow-md shadow-amber-500/20 cursor-pointer hover:scale-105 active:scale-95'
+                }`}
+              >
+                <Zap className="w-4 h-4 fill-white text-white" />
+                <span>{isExecutingStep ? 'EXECUTING...' : isTaskComplete ? 'ALL STEPS COMPLETED' : 'NEXT STEP'}</span>
+              </button>
+
+              {onStopGuidedSolve && (
+                <button
+                  id="guide-solve-stop-bottom-btn"
+                  onClick={onStopGuidedSolve}
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
+                >
+                  <Square className="w-3.5 h-3.5 fill-rose-500 text-rose-500" />
+                  <span>STOP GUIDED SOLVE</span>
+                </button>
+              )}
+            </>
           ) : (
-            /* Workspace clear status indication */
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-600 dark:text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-bold text-slate-700 dark:text-slate-200">Interactive Workspace</span>
-              <span className="text-slate-400 hidden sm:inline">• Pointer Tools active above</span>
-            </div>
+            /* MANUAL PLAY FLOW: START GUIDED SOLVE + WORKSPACE STATUS */
+            <>
+              {onStartGuidedSolve && (
+                <button
+                  id="guide-solve-start-bottom-btn"
+                  onClick={onStartGuidedSolve}
+                  disabled={isTaskComplete}
+                  className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#FFF3E0] hover:bg-[#FFE7C4] dark:bg-[#2A1D0D] dark:hover:bg-[#382611] border-2 border-[#FDBA5A] text-[#7C3F00] dark:text-[#FDBA5A] text-xs font-bold shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
+                >
+                  <Zap className="w-4 h-4 fill-[#F59E0B] text-[#F59E0B]" />
+                  <span>GUIDED SOLVE</span>
+                  <span className="text-[10px] font-normal opacity-75">(-3 pts)</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-2 text-xs font-mono text-slate-600 dark:text-slate-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-bold text-slate-700 dark:text-slate-200">Interactive Workspace</span>
+                <span className="text-slate-400 hidden sm:inline">• Pointer Tools active above</span>
+              </div>
+            </>
           )}
         </div>
 

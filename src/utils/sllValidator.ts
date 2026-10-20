@@ -71,7 +71,7 @@ export function validateTaskAnswer(
   customDeletePosition?: number
 ): SLLValidationResult {
   const analysis = analyzeLinkedList(nodes, pointers);
-  const { orderedData, visitedAddresses, orphanedNodes, hasCycle, lastVisitedAddress } = analysis;
+  const { orderedNodes, orderedData, visitedAddresses, orphanedNodes, hasCycle, lastVisitedAddress } = analysis;
 
   // 1. Check for infinite loops / cycles
   if (hasCycle) {
@@ -328,6 +328,156 @@ export function validateTaskAnswer(
         ...analysis,
       };
     }
+  }
+
+  // L4_T1: Insert at Any Position dynamic validation
+  if (task.id === 'L4_T1' || task.targetCondition.customValidator === 'L4_T1_INSERT_ANY') {
+    const initialOrdered = task.initialNodes && task.initialPointers
+      ? analyzeLinkedList(task.initialNodes, task.initialPointers).orderedData
+      : [10, 20, 30, 40, 50];
+    const initialList = initialOrdered.length > 0 ? initialOrdered : [10, 20, 30, 40, 50];
+    const n = initialList.length;
+
+    let pos = customDeletePosition;
+    if (pos === undefined) {
+      // Auto-detect position from inserted node if not explicitly passed
+      for (let i = 0; i < orderedData.length; i++) {
+        const withoutI = orderedData.filter((_, idx) => idx !== i);
+        if (
+          withoutI.length === initialList.length &&
+          initialList.every((val, idx) => withoutI[idx] === val)
+        ) {
+          pos = i + 1;
+          break;
+        }
+      }
+      if (pos === undefined) {
+        pos = 3;
+      }
+    }
+
+    // 1. Validate position boundaries (1 to n + 1)
+    if (pos < 1 || pos > n + 1) {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'Invalid Insertion Position',
+          message: `Position ${pos} is invalid. Valid positions for a ${n}-node list are 1 through ${n + 1}.`,
+          explanation: `In 1-based indexing, valid positions range from 1 (Beginning) to ${n + 1} (End).`,
+        },
+        ...analysis,
+      };
+    }
+
+    // 2. Check for orphaned / unlinked nodes in RAM
+    if (orphanedNodes.length > 0) {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'Unlinked Node Detected',
+          message: `Node(s) at address [${orphanedNodes.map((node) => node.address).join(', ')}] are not connected to the linked list.`,
+          explanation: 'All allocated nodes must either be linked into the list reachable from HEAD or freed from memory.',
+        },
+        ...analysis,
+      };
+    }
+
+    // 3. Check total node count (must increase by exactly one)
+    if (orderedData.length !== n + 1) {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'Incorrect Node Count',
+          message: `Linked list contains ${orderedData.length} nodes, but expected ${n + 1} nodes after a single insertion.`,
+          explanation: `Inserting a new node must increase the total linked-list node count by exactly one (from ${n} to ${n + 1}).`,
+        },
+        ...analysis,
+      };
+    }
+
+    // 4. Identify the inserted node and verify that original nodes remain intact in relative order
+    const insertedVal = orderedData[pos - 1];
+    const listWithoutInserted = orderedData.filter((_, idx) => idx !== pos - 1);
+    const isOriginalIntact =
+      listWithoutInserted.length === initialList.length &&
+      initialList.every((val, idx) => listWithoutInserted[idx] === val);
+
+    if (!isOriginalIntact) {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'List Sequence Disrupted',
+          message: `The original nodes were modified or reordered incorrectly. Current list: [${orderedData.join(' → ')}].`,
+          explanation: `Inserting a node at Position ${pos} should preserve the relative order of all original nodes: [${initialList.join(' → ')}].`,
+        },
+        ...analysis,
+      };
+    }
+
+    // 5. Check HEAD pointer
+    const expectedHeadAddr = orderedNodes[0]?.address ?? null;
+    if (pointers.headAddress !== expectedHeadAddr) {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'HEAD Pointer Mismatch',
+          message: `HEAD points to ${pointers.headAddress !== null ? pointers.headAddress : 'NULL'}, but should point to the first node (Address ${expectedHeadAddr}).`,
+          explanation: pos === 1
+            ? 'When inserting at Position 1 (Beginning), HEAD must be updated to the new node.'
+            : 'HEAD must always point to the first node in the list.',
+        },
+        ...analysis,
+      };
+    }
+
+    // 6. Check TAIL pointer
+    const expectedTailAddr = orderedNodes[orderedNodes.length - 1]?.address ?? null;
+    if (pointers.tailAddress !== expectedTailAddr) {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'TAIL Pointer Mismatch',
+          message: `TAIL points to ${pointers.tailAddress !== null ? pointers.tailAddress : 'NULL'}, but should point to the last node (Address ${expectedTailAddr}).`,
+          explanation: pos === n + 1
+            ? 'When inserting at Position ' + (n + 1) + ' (End), TAIL must be updated to the new node.'
+            : 'TAIL must point to the last node in the list.',
+        },
+        ...analysis,
+      };
+    }
+
+    // 7. Check last node's NEXT is NULL
+    if (orderedNodes[orderedNodes.length - 1]?.nextAddress !== null) {
+      return {
+        isValid: false,
+        feedback: {
+          type: 'error',
+          title: 'Last Node NEXT is Not NULL',
+          message: `The last node (Address ${expectedTailAddr}) does not point to NULL.`,
+          explanation: 'In a singly linked list, the final node must terminate with NEXT = NULL.',
+        },
+        ...analysis,
+      };
+    }
+
+    // 8. Success!
+    const desc = pos === 1 ? 'Beginning' : pos === n + 1 ? 'End' : 'Middle';
+    return {
+      isValid: true,
+      feedback: {
+        type: 'success',
+        title: 'Position Insertion Complete! 🎉',
+        message: `Node [${insertedVal}] successfully inserted at Position ${pos} (${desc} Insertion). Full list: [${orderedData.join(' → ')} → NULL].`,
+        explanation: 'All pointer connections, HEAD, TAIL, and list length verified successfully!',
+      },
+      ...analysis,
+    };
   }
 
   // L4_T2: Delete at Any Position dynamic validation
